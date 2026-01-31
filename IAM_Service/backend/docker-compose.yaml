@@ -1,0 +1,80 @@
+services:
+  # Base de données PostgreSQL
+  iam-db:
+    image: postgres:15-alpine
+    container_name: iam-postgres
+    environment:
+      POSTGRES_USER: user_admin
+      POSTGRES_PASSWORD: password_secure
+      # On initialise deux DB : une pour Keycloak, une pour notre IAM
+      POSTGRES_MULTIPLE_DATABASES: keycloak_db,iam_logic_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_admin -d iam_logic_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - iam-network
+
+  # Serveur de messagerie RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: iam-rabbitmq
+    ports:
+      - "5672:5672"   # Port AMQP
+      - "15672:15672" # Management UI (guest/guest)
+    networks:
+      - iam-network
+
+  # Serveur Keycloak (Identity Provider)
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.0
+    container_name: iam-keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://iam-db:5432/keycloak_db
+      KC_DB_USERNAME: user_admin
+      KC_DB_PASSWORD: password_secure
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin_password
+    ports:
+      - "8080:8080"
+    depends_on:
+      - iam-db
+    networks:
+      - iam-network
+
+  # Ton Service IAM (Spring Boot)
+  iam-service:
+    build: .
+    container_name: iam-service-app
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://iam-db:5432/iam_logic_db
+      - SPRING_DATASOURCE_USERNAME=user_admin
+      - SPRING_DATASOURCE_PASSWORD=password_secure
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - KEYCLOAK_SERVER_URL=http://iam-keycloak:8080
+    depends_on:
+       iam-db:
+         condition: service_healthy
+       keycloak:
+         condition: service_started
+       rabbitmq:
+         condition: service_started  
+    networks:
+      - iam-network
+
+networks:
+  iam-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

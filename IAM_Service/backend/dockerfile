@@ -1,0 +1,30 @@
+# Étape 1 : Build (Construction)
+# Utilisation de Maven avec JDK 21 pour correspondre à ton pom.xml
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /app
+
+# Optimisation du cache : on ne télécharge les dépendances 
+# que si le pom.xml change
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Copie du code source et compilation
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# Étape 2 : Run (Exécution)
+# On utilise eclipse-temurin en version 21 pour l'exécution
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+
+# Installation de 'shadow' pour avoir useradd si nécessaire sur certaines images
+# Et création d'un utilisateur non-root pour la sécurité
+RUN useradd -ms /bin/bash springuser
+USER springuser
+
+# Récupération du jar généré à l'étape précédente
+COPY --from=build /app/target/*.jar app.jar
+
+# Configuration des paramètres JVM pour Java 21
+# Note : -XX:+ZGenerational nécessite Java 21+ 
+ENTRYPOINT ["java", "-XX:+UseZGC", "-XX:+ZGenerational", "-jar", "app.jar"]
