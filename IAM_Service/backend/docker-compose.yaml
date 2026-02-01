@@ -35,7 +35,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
     container_name: iam-keycloak
-    command: start-dev
+    command: start-dev --http-enabled=true # Force le HTTP pour le dev
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://iam-db:5432/keycloak_db
@@ -43,6 +43,10 @@ services:
       KC_DB_PASSWORD: password_secure
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin_password
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_DEBUG: "true"
     ports:
       - "8080:8080"
     depends_on:

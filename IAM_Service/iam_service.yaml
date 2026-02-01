@@ -1,0 +1,460 @@
+openapi: 3.0.3
+info:
+  title: IAM Service API (Identity & Access Management)
+  description: |
+    Service gérant l'authentification, le cycle de vie des utilisateurs et l'isolation multi-tenant.
+    Gère les acteurs : Center Owner, Unit Manager, Staff Member, Candidate.
+  version: 1.0.0
+
+servers:
+  - url: /v1
+    description: Version 1 de l'API IAM
+
+paths:
+  # --- SECTION A: ONBOARDING (UC1, UC2) ---
+  /v1/auth/onboarding:
+    post:
+      summary: Register Organization (UC1)
+      tags: [Onboarding]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingRequest'
+      responses:
+        '201':
+          description: Organisation réservée, Chef de centre créé (Pending).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/auth/verify-email:
+    post:
+      summary: Verify Email/Account (UC2)
+      tags: [Onboarding]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: "Compte activé."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # --- SECTION B: USER PROVISIONING & DIRECTORY (UC3, UC4, UC8, UC9) ---
+  /v1/users:
+    get:
+      summary: Read Directory (UC8, UC9)
+      description: Liste filtrée par external_organization_id ou external_unit_id selon le token.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: "Répertoire des utilisateurs lu avec succès."
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserResponse' }
+
+  /v1/users/staff:
+    post:
+      summary: Provisionner un membre du staff (UC3)
+      tags: [Users]
+      description: Réservé aux Owners et Managers.
+      security: [{ bearerAuth: [ "admin:write" ] }] # Scope spécifique
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/memberStaffCreateRequest'
+      responses:
+        '201': 
+          description: "Membre du staff créé (Password temporaire généré)."
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/memberStaffCreateResponse' }  
+
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/users/candidates:
+    post:
+      summary: Enrôler un candidat (UC4)
+      tags: [Users]
+      description: Accessible au Staff, Managers et Owners.
+      security: [{ bearerAuth: [ "staff:write" ] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateCreateRequest'
+      responses:
+        '201': 
+          description: "Candidat créé (Password temporaire généré)."
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CandidateCreateResponse' }  
+
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+
+  # --- SECTION C: PROFILE MANAGEMENT (UC5, UC10, UC13) ---
+  /v1/users/{id}:
+    patch:
+      summary: Update Staff/Candidate Profile (UC5a, UC5b, UC10)
+      description: Modification limitée par les règles d'isolation (AF2.3).
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+      responses:
+        '200': { description: "Profil mis à jour." }
+        '403': { description: "Restrict Cross-Unit Access (UC11/AF2.3)." }
+
+  /v1/users/me/password:
+    put:
+      summary: Change Password on First Login (UC13)
+      tags: [Profile]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200': 
+          description: "Mot de passe mis à jour, mustChangePassword passé à false." 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # --- SECTION D: ACCOUNT STATUS & AUDIT (UC6, UC7, UC16) ---
+  /v1/users/{id}/status:
+    patch:
+      summary: Deactivate/Ban User Account (UC6)
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isActive: { type: boolean }
+      responses:
+        '200': { description: "Statut modifié." }
+
+  /v1/audit-logs:
+    get:
+      summary: Audit User Actions (UC7)
+      tags: [Audit]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: targetId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Logs d'audit récupérés."
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditLogResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # --- SECTION E: AUTHENTICATION LIFECYCLE (UC11, UC12, UC14, UC15) ---
+  /v1/auth/login:
+    post:
+      summary: Login (UC11)
+      tags: [Authentication]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: "Authentification réussie."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }  
+  
+
+  /v1/auth/password-reset-request:
+    post:
+      summary: Request Password Reset (UC14)
+      tags: [Authentication]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202': { description: "Si l'email existe, un lien a été envoyé." }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/auth/password-reset-confirm:
+    post:
+      summary: Confirmer le nouveau mot de passe (UC14 - Suite)
+      tags: [Authentication]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string, description: "Le token reçu par email" }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200': { description: "Mot de passe mis à jour avec succès." }
+
+  /v1/auth/refresh:
+    post:
+      summary: Refresh Session Token (UC12)
+      description: |
+        Génère un nouvel Access Token. 
+        Note : Cette route ne doit PAS nécessiter de Bearer Token dans le header car on l'appelle quand l'access token est expiré.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string, description: "Le token de rafraîchissement valide" }
+      responses:
+        '200':
+          description: "Nouveau couple de tokens."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+        '401': { description: "Refresh Token expiré ou révoqué. Reconnexion requise." }
+        '400': { $ref: '#/components/responses/BadRequest' }  
+
+  /v1/auth/logout:
+    post:
+      summary: Logout (UC15)
+      description: Invalide le Refresh Token en base de données et termine la session.
+      tags: [Authentication]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: "Déconnexion réussie."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  refreshToken: { type: string }
+                  userId: { type: string, format: uuid }
+                  expiryDate: { type: string, format: date-time }
+                  isRevoked: { type: boolean }
+        '401': { description: "Non authentifié." }
+        '400': { $ref: '#/components/responses/BadRequest' }  
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    OnboardingRequest:
+      type: object
+      required: [firstName, lastName, email, password, organizationName]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        password: { type: string }
+        organizationName: { type: string }
+
+    OnboardingResponse:
+      type: object
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        isActive: { type: boolean }
+        external_organization_id: { type: string, format: uuid }
+        mustChangePassword: { type: boolean }
+
+
+    memberStaffCreateRequest:
+      type: object
+      required: [firstName, lastName, email, role, external_unit_id]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        role:
+          type: object
+          properties:
+            roleId: { type: string, format: uuid }
+            name: { type: string, enum: [MANAGER, STAFF] }
+            permissions: { type: array, items: { type: string, enum: ["CREATE_MANAGER", "READ_STAFF"] } }
+        external_unit_id: { type: string, format: uuid }
+
+    memberStaffCreateResponse:
+      type: object
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        role:
+          type: object
+          properties:
+            roleId: { type: string, format: uuid }
+            name: { type: string, example: CANDIDATE, OWNER, MANAGER, STAFF }
+            permissions: { type: array, example: ["CREATE_MANAGER", "READ_STAFF"] }
+        external_unit_id: { type: string, format: uuid }
+        external_organization_id: { type: string, format: uuid }
+        isActive: { type: boolean }
+        mustChangePassword: { type: boolean }
+
+    CandidateCreateRequest:
+      type: object
+      required: [firstName, lastName, email, external_unit_id]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        role:
+          type: object
+          properties:
+            roleId: { type: string, format: uuid }
+            name: { type: string, default: CANDIDATE }
+            permissions: { type: array, items: { type: string, enum: ["CREATE_MANAGER", "READ_STAFF"] } }
+        external_unit_id: { type: string, format: uuid }
+
+    CandidateCreateResponse:
+      type: object
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        external_unit_id: { type: string, format: uuid }
+        external_organization_id: { type: string, format: uuid }
+        isActive: { type: boolean }
+        mustChangePassword: { type: boolean }
+        role:
+          type: object
+          properties:
+            roleId: { type: string, format: uuid }
+            name: { type: string, default: CANDIDATE }
+            permissions: { type: array, items: { type: string, enum: ["CREATE_MANAGER", "READ_STAFF"] } }
+
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        user:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            role:
+              type: object
+              properties:
+                roleId: { type: string, format: uuid }
+                name: { type: string, example: CANDIDATE }
+                permissions: { type: array, items: { type: string, enum: ["CREATE_MANAGER", "READ_STAFF"] } }
+            external_organization_id: { type: string, format: uuid }
+            external_unit_id: { type: string, format: uuid }
+            mustChangePassword: { type: boolean }
+
+    UserResponse:
+      type: object
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        role:
+          type: object
+          properties:
+            roleId: { type: string, format: uuid }
+            name: { type: string, example: CANDIDATE }
+            permissions: { type: array, items: { type: string, enum: ["CREATE_MANAGER", "READ_STAFF"] } }
+        external_unit_id: { type: string, format: uuid }
+        external_organization_id: { type: string, format: uuid }
+        isActive: { type: boolean }
+        mustChangePassword: { type: boolean }
+
+    AuditLogResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid }
+        action: { type: string }
+        target_id: { type: string, format: uuid }
+        payload: { type: object }
+        timestamp: { type: string, format: date-time }
+
+  responses:
+    BadRequest:
+      description: Erreur de validation.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+              message: { type: string }
