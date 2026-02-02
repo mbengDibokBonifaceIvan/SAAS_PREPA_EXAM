@@ -7,5 +7,6 @@ public record OrganizationRegisteredEvent(
     String organizationName,
     String ownerEmail,
     String ownerFirstName,
-    String ownerLastName
+    String ownerLastName,
+    Boolean isOwnerEmailVerified
 ) {}

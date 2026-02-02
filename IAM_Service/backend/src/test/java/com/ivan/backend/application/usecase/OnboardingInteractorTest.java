@@ -42,7 +42,9 @@ class OnboardingInteractorTest {
             "Mon Centre", 
             "ivan@test.com", 
             "Ivan", 
-            "D" 
+            "D" ,
+            true
+            
         );
         when(mapper.toDomain(any(), any())).thenReturn(mockUser);
         when(onboardingDomainService.initiateOnboarding(any(), anyString())).thenReturn(mockEvent);

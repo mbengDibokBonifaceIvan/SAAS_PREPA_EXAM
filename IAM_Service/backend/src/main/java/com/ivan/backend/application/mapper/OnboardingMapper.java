@@ -19,7 +19,9 @@ public class OnboardingMapper {
             request.lastName(),
             new Email(request.email()),
             tenantId,
-            UserRole.CENTER_OWNER
+            null, // unitId par défaut à null
+            UserRole.CENTER_OWNER,
+            false // emailVerified par défaut à false
         );
     }
 
@@ -29,7 +31,8 @@ public class OnboardingMapper {
             user.getLastName(),
             false, // isActive (Pending)
             user.getTenantId(),
-            true   // mustChangePassword
+            true ,  // mustChangePassword
+            user.isEmailVerified()
         );
     }
 }

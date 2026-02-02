@@ -23,7 +23,8 @@ public class OnboardingDomainService {
             orgName,
             owner.getEmail().value(),
             owner.getFirstName(),
-            owner.getLastName()
+            owner.getLastName(),
+            owner.isEmailVerified()
         );
     }
 }

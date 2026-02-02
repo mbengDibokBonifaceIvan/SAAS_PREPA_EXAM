@@ -30,7 +30,7 @@ class OnboardingDomainServiceTest {
     @Test
     void should_initiate_onboarding_successfully() {
         // Given
-        User owner = new User(null, "Ivan", "Test", new Email("ivan@test.com"), UUID.randomUUID(), UserRole.CENTER_OWNER);
+        User owner = new User(null, "Ivan", "Test", new Email("ivan@test.com"), UUID.randomUUID(), null, UserRole.CENTER_OWNER, true);
         when(userRepository.findByEmail(any())).thenReturn(Optional.empty());
 
         // When
@@ -45,7 +45,7 @@ class OnboardingDomainServiceTest {
     @Test
     void should_throw_exception_when_user_email_already_exists() {
         // Given
-        User owner = new User(null, "Ivan", "Test", new Email("exist@test.com"), UUID.randomUUID(), UserRole.CENTER_OWNER);
+        User owner = new User(null, "Ivan", "Test", new Email("exist@test.com"), UUID.randomUUID(), null, UserRole.CENTER_OWNER, true);
         when(userRepository.findByEmail(any())).thenReturn(Optional.of(owner));
 
         // When & Then

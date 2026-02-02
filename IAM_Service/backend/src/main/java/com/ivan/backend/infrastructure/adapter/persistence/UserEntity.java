@@ -24,9 +24,15 @@ public class UserEntity {
     private UserRole role; // On simplifie l'enum pour l'instant
 
     private UUID externalOrganizationId;
+    private UUID externalUnitId = null;
     
-    private boolean isActive = false;
-    private boolean mustChangePassword = true;
+    private boolean isActive = true;
+    private boolean mustChangePassword = false;
+    private boolean isEmailVerified = false;
+    
+    // Audit simple (Toujours utile en base de données)
+    private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
+    private java.time.LocalDateTime updatedAt = java.time.LocalDateTime.now();
 
     // PasswordReset, RefreshToken et AuditLog seront des entités liées (OneToMany) plus tard
 }

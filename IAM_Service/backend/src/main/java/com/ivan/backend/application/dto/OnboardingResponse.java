@@ -7,5 +7,6 @@ public record OnboardingResponse(
     String lastName,
     boolean isActive,
     UUID externalOrganizationId,
-    boolean mustChangePassword
+    boolean mustChangePassword,
+    boolean isEmailVerified
 ) {}

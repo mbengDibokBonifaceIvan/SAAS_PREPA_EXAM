@@ -52,7 +52,7 @@ class OnboardingControllerTest {
             "Ivan", "D", "ivan@test.com", "Pass123!", "Mon Centre");
 
         OnboardingResponse response = new OnboardingResponse(
-            "Ivan", "D", false, UUID.randomUUID(), true);
+            "Ivan", "D", false, UUID.randomUUID(), true, true);
 
         when(onboardingUseCase.execute(any(OnboardingRequest.class))).thenReturn(response);
 

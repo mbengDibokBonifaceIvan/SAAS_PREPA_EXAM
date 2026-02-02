@@ -30,7 +30,8 @@ class RabbitMQMessageAdapterTest {
             "Centre Test", 
             "ivan@test.com", 
             "Ivan", 
-            "D"
+            "D",
+            true
         );
 
         // When: On appelle l'adaptateur d'infrastructure
