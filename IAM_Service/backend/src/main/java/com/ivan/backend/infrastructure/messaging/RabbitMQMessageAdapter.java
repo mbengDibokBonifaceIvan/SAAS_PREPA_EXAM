@@ -1,5 +1,6 @@
 package com.ivan.backend.infrastructure.messaging;
 
+import com.ivan.backend.domain.event.AccountLockedEvent;
 import com.ivan.backend.domain.event.OrganizationRegisteredEvent;
 import com.ivan.backend.domain.port.MessagePublisherPort;
 import lombok.RequiredArgsConstructor;
@@ -24,4 +25,15 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
             event
         );
     }
+
+    @Override
+public void publishAccountLocked(AccountLockedEvent event) {
+    log.warn("Publication de l'événement de verrouillage pour: {}", event.email());
+    
+    rabbitTemplate.convertAndSend(
+        RabbitMQConfig.EXCHANGE_NAME,
+        RabbitMQConfig.ROUTING_KEY_USER_LOCKED,
+        event
+    );
+}
 }

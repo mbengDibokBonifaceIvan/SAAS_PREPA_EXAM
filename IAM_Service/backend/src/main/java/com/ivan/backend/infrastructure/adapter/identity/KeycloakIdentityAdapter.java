@@ -7,6 +7,8 @@ import com.ivan.backend.domain.valueobject.AuthToken;
 import com.ivan.backend.domain.valueobject.ProviderStatus;
 import com.ivan.backend.domain.exception.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -15,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*; // Pour HttpHeaders, HttpEntity, ResponseEntity, MediaType
 
@@ -28,6 +31,7 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 // On implémente les DEUX interfaces pour que l'adapter soit complet
+@Slf4j // Ajoute ceci !
 public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGatekeeper {
 
     private final Keycloak keycloak;
@@ -121,6 +125,7 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
 
     @Override
     public AuthToken authenticate(String email, String password) {
+
         String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", authServerUrl, realm);
 
         HttpHeaders headers = new HttpHeaders();
@@ -149,8 +154,31 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
                     (String) resBody.get("refresh_token"),
                     ((Number) resBody.get("expires_in")).longValue(),
                     (String) resBody.get("token_type"));
-        } catch (Exception e) {
-            throw new KeycloakIdentityException("Identifiants invalides ou serveur indisponible", e);
+} catch (HttpClientErrorException e) {
+            log.error("DEBUG - Status Code: {}", e.getStatusCode());
+
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED || e.getStatusCode() == HttpStatus.BAD_REQUEST) {
+                
+                // 1. On cherche l'ID de l'utilisateur Keycloak par son email
+                List<UserRepresentation> users = keycloak.realm(realm).users().searchByEmail(email, true);
+                
+                if (!users.isEmpty()) {
+                    String userId = users.get(0).getId();
+                    
+                    // 2. On demande explicitement à Keycloak si cet ID est bloqué par le Brute Force
+                    // Cette API renvoie l'état du verrouillage temporaire !
+                    var bruteForceStatus = keycloak.realm(realm).attackDetection().bruteForceUserStatus(userId);
+                    
+                    // "disabled" dans ce contexte signifie "verrouillé par brute force"
+                    boolean isBruteForceLocked = (boolean) bruteForceStatus.get("disabled");
+
+                    if (isBruteForceLocked || !users.get(0).isEnabled()) {
+                        log.warn("BLOCAGE DÉTECTÉ via Admin API pour l'utilisateur : {}", email);
+                        throw new AccountLockedException("Compte verrouillé (Brute Force)");
+                    }
+                }
+            }
+            throw new KeycloakIdentityException("Identifiants invalides");
         }
     }
 

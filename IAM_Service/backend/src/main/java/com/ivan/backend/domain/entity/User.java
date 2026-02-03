@@ -57,4 +57,11 @@ public class User {
         this.mustChangePassword = required;
     }
 
+    /**
+     * Désactive le compte utilisateur.
+     */
+    public void deactivate() {
+        this.isActive = false;
+    }
+
 }
