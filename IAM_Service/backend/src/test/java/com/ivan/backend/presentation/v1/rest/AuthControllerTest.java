@@ -47,7 +47,7 @@ class AuthControllerTest {
         when(loginUseCase.login(any(LoginRequest.class))).thenReturn(response);
 
         // WHEN & THEN
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
@@ -65,7 +65,7 @@ class AuthControllerTest {
             .thenThrow(new KeycloakIdentityException("Identifiants invalides"));
 
         // WHEN & THEN
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isUnauthorized())
