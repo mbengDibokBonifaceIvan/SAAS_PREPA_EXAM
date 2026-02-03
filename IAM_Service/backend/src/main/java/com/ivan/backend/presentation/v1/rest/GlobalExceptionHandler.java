@@ -1,5 +1,6 @@
 package com.ivan.backend.presentation.v1.rest;
 
+import com.ivan.backend.domain.exception.KeycloakIdentityException;
 import com.ivan.backend.domain.exception.UserAlreadyExistsException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +8,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException; // <--- LE 
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -38,4 +41,15 @@ public class GlobalExceptionHandler {
         
         return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Validation echouée: " + details));
     }
+
+    @ExceptionHandler(KeycloakIdentityException.class)
+    public ResponseEntity<Object> handleKeycloakException(KeycloakIdentityException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.UNAUTHORIZED.value());
+        body.put("message", ex.getMessage());
+        
+        return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
+    }
+    
 }

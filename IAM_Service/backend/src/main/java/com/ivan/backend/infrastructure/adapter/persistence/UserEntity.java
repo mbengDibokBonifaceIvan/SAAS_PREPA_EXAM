@@ -26,7 +26,7 @@ public class UserEntity {
     private UUID externalOrganizationId;
     private UUID externalUnitId = null;
     
-    private boolean isActive = true;
+    private boolean isActive = false;
     private boolean mustChangePassword = false;
     private boolean isEmailVerified = false;
     

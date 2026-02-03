@@ -21,7 +21,9 @@ public class OnboardingMapper {
             tenantId,
             null, // unitId par défaut à null
             UserRole.CENTER_OWNER,
-            false // emailVerified par défaut à false
+            false ,// emailVerified par défaut à false
+            false, // isActive par défaut à false
+            false  // mustChangePassword par défaut à false
         );
     }
 
@@ -29,9 +31,9 @@ public class OnboardingMapper {
         return new OnboardingResponse(
             user.getFirstName(),
             user.getLastName(),
-            false, // isActive (Pending)
+            user.isActive(),
             user.getTenantId(),
-            true ,  // mustChangePassword
+            user.isMustChangePassword(),
             user.isEmailVerified()
         );
     }

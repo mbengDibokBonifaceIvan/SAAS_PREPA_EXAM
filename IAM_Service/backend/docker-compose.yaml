@@ -66,6 +66,9 @@ services:
       - SPRING_DATASOURCE_USERNAME=user_admin
       - SPRING_DATASOURCE_PASSWORD=password_secure
       - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - KEYCLOAK_CLIENT_SECRET=dQUkVayuw9cvTADJ1W7LFJfeVL5EvOTU 
       - KEYCLOAK_SERVER_URL=http://iam-keycloak:8080
     depends_on:
        iam-db:

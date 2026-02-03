@@ -39,7 +39,9 @@ class JpaUserRepositoryAdapterTest {
             tenantId, 
             null,
             UserRole.CENTER_OWNER,
-            true
+            true,
+            true,
+            false
         );
 
         // When: On sauvegarde via l'adaptateur

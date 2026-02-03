@@ -26,7 +26,8 @@ public class JpaUserRepositoryAdapter implements UserRepository {
         // On mappe le champ même s'il est null dans le domaine pour l'instant
         entity.setExternalUnitId(null);
         entity.setEmailVerified(user.isEmailVerified());
-        
+        entity.setActive(user.isActive());
+    entity.setMustChangePassword(user.isMustChangePassword());
         repository.save(entity);
         return user;
     }
@@ -42,7 +43,9 @@ public class JpaUserRepositoryAdapter implements UserRepository {
                         entity.getExternalOrganizationId(),
                         entity.getExternalUnitId(),
                         entity.getRole(),
-                        entity.isEmailVerified()
+                        entity.isEmailVerified(),
+                        entity.isActive(),
+                        entity.isMustChangePassword()
                 ));
     }
 }
