@@ -69,7 +69,7 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
         }
 
         userRep.setRequiredActions(actions);
-        
+
         // 2. Attributs personnalisés
         userRep.setAttributes(Map.of(
                 "tenantId", Collections.singletonList(user.getTenantId().toString()),
@@ -173,4 +173,24 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
         return new ProviderStatus(isEmailVerified, mustChangePassword);
     }
 
+    @Override
+    public void logout(String refreshToken) {
+        String logoutUrl = String.format("%s/realms/%s/protocol/openid-connect/logout", authServerUrl, realm);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("client_id", clientId);
+        body.add("client_secret", clientSecret);
+        body.add("refresh_token", refreshToken);
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+
+        try {
+            restTemplate.postForEntity(logoutUrl, request, Void.class);
+        } catch (Exception e) {
+            throw new KeycloakIdentityException("Erreur lors de la déconnexion : session introuvable ou déjà expirée");
+        }
+    }
 }

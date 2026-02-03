@@ -11,4 +11,6 @@ public interface IdentityGatekeeper {
     // Récupération des infos de statut depuis le fournisseur d'identité
     ProviderStatus getStatus(String email);
 
+    void logout(String refreshToken);
+
 }

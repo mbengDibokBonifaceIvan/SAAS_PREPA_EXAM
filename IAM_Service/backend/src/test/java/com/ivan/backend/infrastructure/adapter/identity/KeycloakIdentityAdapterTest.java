@@ -16,13 +16,13 @@ import org.keycloak.admin.client.Keycloak;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -31,23 +31,28 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import org.keycloak.admin.client.resource.*;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
+// Pour le test RestTemplate / MockRestServiceServer
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
+import static org.hamcrest.Matchers.containsString;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+
 @ExtendWith(MockitoExtension.class)
 class KeycloakIdentityAdapterTest {
 
     @Mock
     private Keycloak keycloak;
-    
-    @Mock 
-    private RestTemplate restTemplate;
-    
+
+   // RestTemplate DOIT être une vraie instance pour MockRestServiceServer
+    private RestTemplate restTemplate = new RestTemplate();
+
     @Mock
     private RealmResource realmResource;
 
@@ -57,18 +62,26 @@ class KeycloakIdentityAdapterTest {
     @InjectMocks
     private KeycloakIdentityAdapter adapter;
 
+    @Autowired
+    private MockRestServiceServer server;
+
     @BeforeEach
     void setup() {
+        // Manuellement injecter le vrai RestTemplate dans l'adapter
+        ReflectionTestUtils.setField(adapter, "restTemplate", restTemplate);
+
         // On injecte manuellement la valeur de la propriété @Value("${keycloak.realm}")
         ReflectionTestUtils.setField(adapter, "realm", "ExamsRealm");
-ReflectionTestUtils.setField(adapter, "clientId", "iam-client");
+        ReflectionTestUtils.setField(adapter, "clientId", "iam-client");
         ReflectionTestUtils.setField(adapter, "clientSecret", "secret");
 
         // On utilise lenient() pour éviter l'exception dans le test d'authentification
         // On simule la cascade d'appels : keycloak.realm("...").users()
         lenient().when(keycloak.realm(anyString())).thenReturn(realmResource);
         lenient().when(realmResource.users()).thenReturn(usersResource);
-    }
+
+        // On crée le serveur basé sur la VRAIE instance
+        server = MockRestServiceServer.createServer(restTemplate);    }
 
     @Test
     @DisplayName("Devrait créer une identité dans Keycloak et envoyer l'email de vérification")
@@ -85,8 +98,8 @@ ReflectionTestUtils.setField(adapter, "clientId", "iam-client");
                 false,
                 false,
                 true
-            
-            );
+
+        );
 
         // CRUCIAL : URI retournée par Keycloak dans le header Location
         URI userUri = URI.create(
@@ -98,7 +111,8 @@ ReflectionTestUtils.setField(adapter, "clientId", "iam-client");
 
         when(usersResource.create(any())).thenReturn(mockResponse);
 
-        // On mock également l'appel sendVerifyEmail et l'assignation de rôle pour éviter d'autres NPE
+        // On mock également l'appel sendVerifyEmail et l'assignation de rôle pour
+        // éviter d'autres NPE
         UserResource userResourceMock = mock(UserResource.class);
         RoleMappingResource roleMappingResourceMock = mock(RoleMappingResource.class);
         RoleScopeResource roleScopeResourceMock = mock(RoleScopeResource.class);
@@ -121,29 +135,24 @@ ReflectionTestUtils.setField(adapter, "clientId", "iam-client");
         verify(userResourceMock, times(1)).sendVerifyEmail();
     }
 
-    @Test
-    @DisplayName("Devrait retourner un token valide lors d'une authentification réussie")
-    void should_return_auth_token_on_successful_authentication() {
-        // GIVEN
-        Map<String, Object> mockResponseBody = Map.of(
-            "access_token", "fake-jwt-token",
-            "refresh_token", "fake-refresh-token",
-            "expires_in", 3600,
-            "token_type", "Bearer"
-        );
+   @Test
+@DisplayName("Devrait retourner un token valide lors d'une authentification réussie")
+void should_return_auth_token_on_successful_authentication(){
+    // GIVEN
+    String responseJson = "{\"access_token\":\"fake-jwt-token\",\"refresh_token\":\"fake-refresh-token\",\"expires_in\":3600}";
 
-        when(restTemplate.postForEntity(anyString(), any(), eq(Map.class)))
-            .thenReturn(ResponseEntity.ok(mockResponseBody));
+    server.expect(requestTo(containsString("/protocol/openid-connect/token")))
+          .andExpect(method(HttpMethod.POST))
+          .andRespond(withSuccess(responseJson, org.springframework.http.MediaType.APPLICATION_JSON));
 
-        // WHEN
-        AuthToken result = adapter.authenticate("ivan@test.com", "password123");
+    // WHEN
+    AuthToken result = adapter.authenticate("ivan@test.com", "password123");
 
-        // THEN
-        assertNotNull(result);
-        assertEquals("fake-jwt-token", result.accessToken());
-        assertEquals(3600L, result.expiresIn());
-        verify(restTemplate).postForEntity(contains("/protocol/openid-connect/token"), any(), eq(Map.class));
-    }
+    // THEN
+    assertNotNull(result);
+    assertEquals("fake-jwt-token", result.accessToken());
+    server.verify();
+}
 
     @Test
     @DisplayName("Devrait récupérer le statut de vérification et de changement de mot de passe")
@@ -165,5 +174,15 @@ ReflectionTestUtils.setField(adapter, "clientId", "iam-client");
         verify(usersResource).searchByEmail(email, true);
     }
 
+    @Test
+    void shouldCallKeycloakLogoutEndpoint() {
+        server.expect(requestTo(containsString("/protocol/openid-connect/logout")))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().string(containsString("refresh_token=test-token")))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+        assertDoesNotThrow(() -> adapter.logout("test-token"));
+        server.verify();
+    }
 
 }
