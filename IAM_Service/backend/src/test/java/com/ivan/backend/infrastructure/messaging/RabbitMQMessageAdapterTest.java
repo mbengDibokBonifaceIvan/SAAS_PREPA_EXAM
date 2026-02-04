@@ -1,6 +1,8 @@
 package com.ivan.backend.infrastructure.messaging;
 
 import com.ivan.backend.domain.event.OrganizationRegisteredEvent;
+import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -8,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
@@ -22,7 +25,7 @@ class RabbitMQMessageAdapterTest {
     private RabbitMQMessageAdapter adapter;
 
     @Test
-    void should_send_message_to_correct_exchange() {
+    void should_send_json_organization_registered_event() {
         // Given: On prépare un événement conforme au record du Domain
         UUID orgId = UUID.randomUUID();
         var event = new OrganizationRegisteredEvent(
@@ -45,4 +48,21 @@ class RabbitMQMessageAdapterTest {
             event
         );
     }
+
+    @Test
+    void should_send_json_password_reset_requested_event() {
+        // GIVEN
+        var event = new PasswordResetRequestedEvent("ivan@test.com", LocalDateTime.now());
+
+        // WHEN
+        adapter.publishPasswordResetRequested(event);
+
+        // THEN
+        verify(rabbitTemplate).convertAndSend(
+            RabbitMQConfig.EXCHANGE_NAME,
+            RabbitMQConfig.ROUTING_KEY_PASSWORD_RESET_REQUESTED,
+            event
+        );
+    }
+    
 }

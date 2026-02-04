@@ -4,4 +4,5 @@ import com.ivan.backend.domain.entity.User;
 
 public interface IdentityManagerPort {
     void createIdentity(User user, String password);
+    void sendPasswordReset(String email);
 }

@@ -154,21 +154,22 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
                     (String) resBody.get("refresh_token"),
                     ((Number) resBody.get("expires_in")).longValue(),
                     (String) resBody.get("token_type"));
-} catch (HttpClientErrorException e) {
+        } catch (HttpClientErrorException e) {
             log.error("DEBUG - Status Code: {}", e.getStatusCode());
 
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED || e.getStatusCode() == HttpStatus.BAD_REQUEST) {
-                
+
                 // 1. On cherche l'ID de l'utilisateur Keycloak par son email
                 List<UserRepresentation> users = keycloak.realm(realm).users().searchByEmail(email, true);
-                
+
                 if (!users.isEmpty()) {
                     String userId = users.get(0).getId();
-                    
-                    // 2. On demande explicitement à Keycloak si cet ID est bloqué par le Brute Force
+
+                    // 2. On demande explicitement à Keycloak si cet ID est bloqué par le Brute
+                    // Force
                     // Cette API renvoie l'état du verrouillage temporaire !
                     var bruteForceStatus = keycloak.realm(realm).attackDetection().bruteForceUserStatus(userId);
-                    
+
                     // "disabled" dans ce contexte signifie "verrouillé par brute force"
                     boolean isBruteForceLocked = (boolean) bruteForceStatus.get("disabled");
 
@@ -221,4 +222,18 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
             throw new KeycloakIdentityException("Erreur lors de la déconnexion : session introuvable ou déjà expirée");
         }
     }
+
+    @Override
+    public void sendPasswordReset(String email) {
+        List<UserRepresentation> users = keycloak.realm(realm)
+                .users().searchByEmail(email, true);
+
+        if (!users.isEmpty()) {
+            String userId = users.get(0).getId();
+            // Action magique de Keycloak : génère le lien et envoie l'email
+            keycloak.realm(realm).users().get(userId)
+                    .executeActionsEmail(List.of("UPDATE_PASSWORD"));
+        }
+    }
+
 }
