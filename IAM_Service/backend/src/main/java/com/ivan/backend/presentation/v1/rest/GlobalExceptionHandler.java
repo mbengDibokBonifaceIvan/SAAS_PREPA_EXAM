@@ -86,4 +86,6 @@ public class GlobalExceptionHandler {
         problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }
+
+    
 }

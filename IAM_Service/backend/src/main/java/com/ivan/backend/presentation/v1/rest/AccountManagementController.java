@@ -1,8 +1,12 @@
 package com.ivan.backend.presentation.v1.rest;
 
 import com.ivan.backend.application.dto.ProvisionUserRequest;
+import com.ivan.backend.application.dto.UserResponse;
 import com.ivan.backend.application.port.ManageAccountInputPort;
 import com.ivan.backend.application.port.ProvisionUserInputPort;
+import com.ivan.backend.application.usecase.SearchUserUseCase;
+import com.ivan.backend.domain.entity.User;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +15,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/v1/accounts")
@@ -20,6 +26,8 @@ public class AccountManagementController {
 
     private final ProvisionUserInputPort provisionUserUseCase;
     private final ManageAccountInputPort manageAccountUseCase;
+    private final SearchUserUseCase searchUserUseCase;
+
 
     private static final String EMAIL = "email";
 
@@ -63,4 +71,31 @@ public class AccountManagementController {
         manageAccountUseCase.activateAccount(email, ownerEmail);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * UC7: Récupérer mon propre profil
+     */
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getMyProfile(@AuthenticationPrincipal Jwt jwt) {
+        String email = jwt.getClaimAsString(EMAIL);
+        User user = searchUserUseCase.getUserProfile(email);
+        return ResponseEntity.ok(UserResponse.fromDomain(user));
+    }
+
+    /**
+     * UC8 & UC9: Récupérer l'annuaire selon mes droits
+     */
+   @GetMapping("/directory")
+@PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER')")
+public ResponseEntity<List<UserResponse>> getDirectory(
+        @AuthenticationPrincipal Jwt jwt,
+        @RequestParam(required = false) UUID unitId // Paramètre optionnel : ?unitId=...
+) {
+    String email = jwt.getClaimAsString(EMAIL);
+    List<User> users = searchUserUseCase.getDirectory(email, unitId);
+    
+    return ResponseEntity.ok(users.stream()
+            .map(UserResponse::fromDomain)
+            .toList());
+}
 }

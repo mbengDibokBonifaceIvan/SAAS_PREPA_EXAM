@@ -8,6 +8,7 @@ import com.ivan.backend.domain.valueobject.UserRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,54 +20,78 @@ public class JpaUserRepositoryAdapter implements UserRepository {
 
     @Override
     public User save(User user) {
-        // On cherche l'entité existante pour faire un vrai UPDATE
+        // Ta logique de save conservée et isolée
         UserEntity entity = repository.findById(user.getId())
                 .orElse(new UserEntity());
 
-        entity.setUserId(user.getId());
-        entity.setFirstName(user.getFirstName());
-        entity.setLastName(user.getLastName());
-        entity.setEmail(user.getEmail().value());
-        entity.setRole(user.getRole());
-        entity.setExternalOrganizationId(user.getTenantId());
-        // On mappe le champ même s'il est null dans le domaine pour l'instant
-        entity.setExternalUnitId(user.getUnitId());
-        entity.setEmailVerified(user.isEmailVerified());
-        entity.setActive(user.isActive());
-        entity.setMustChangePassword(user.isMustChangePassword());
+        updateEntityFromDomain(entity, user);
+
         repository.save(entity);
         return user;
     }
 
     @Override
+    public Optional<User> findById(UUID id) {
+        return repository.findById(id).map(this::mapToDomain);
+    }
+
+    @Override
     public Optional<User> findByEmail(Email email) {
-        return repository.findByEmail(email.value())
-                .map(entity -> new User(
-                        entity.getUserId(),
-                        entity.getFirstName(),
-                        entity.getLastName(),
-                        new Email(entity.getEmail()),
-                        entity.getExternalOrganizationId(),
-                        entity.getExternalUnitId(),
-                        entity.getRole(),
-                        entity.isEmailVerified(),
-                        entity.isActive(),
-                        entity.isMustChangePassword()));
+        return repository.findByEmail(email.value()).map(this::mapToDomain);
     }
 
     @Override
     public Optional<User> findByRoleAndTenantId(UserRole role, UUID tenantId) {
-        return repository.findByRoleAndExternalOrganizationId(role, tenantId)
-                .map(entity -> new User(
-                        entity.getUserId(),
-                        entity.getFirstName(),
-                        entity.getLastName(),
-                        new Email(entity.getEmail()),
-                        entity.getExternalOrganizationId(),
-                        entity.getExternalUnitId(),
-                        entity.getRole(),
-                        entity.isEmailVerified(),
-                        entity.isActive(),
-                        entity.isMustChangePassword()));
+        return repository.findByRoleAndExternalOrganizationId(role, tenantId).map(this::mapToDomain);
+    }
+
+    @Override
+    public List<User> findAllByTenantId(UUID tenantId) {
+        return repository.findAllByExternalOrganizationId(tenantId).stream()
+                .map(this::mapToDomain)
+                .toList();
+    }
+
+    @Override
+    public List<User> findAllByUnitId(UUID unitId) {
+        return repository.findAllByExternalUnitId(unitId).stream()
+                .map(this::mapToDomain)
+                .toList();
+    }
+
+    @Override
+    public List<User> findAllByUnitIdAndTenantId(UUID unitId, UUID tenantId) {
+        return repository.findAllByExternalUnitIdAndExternalOrganizationId(unitId, tenantId).stream()
+                .map(this::mapToDomain)
+                .toList();
+    }
+
+    // --- MAPPING PRIVÉ ---
+
+    private User mapToDomain(UserEntity entity) {
+        return new User(
+                entity.getUserId(),
+                entity.getFirstName(),
+                entity.getLastName(),
+                new Email(entity.getEmail()),
+                entity.getExternalOrganizationId(),
+                entity.getExternalUnitId(),
+                entity.getRole(),
+                entity.isEmailVerified(),
+                entity.isActive(),
+                entity.isMustChangePassword());
+    }
+
+    private void updateEntityFromDomain(UserEntity entity, User domain) {
+        entity.setUserId(domain.getId());
+        entity.setFirstName(domain.getFirstName());
+        entity.setLastName(domain.getLastName());
+        entity.setEmail(domain.getEmail().value());
+        entity.setRole(domain.getRole());
+        entity.setExternalOrganizationId(domain.getTenantId());
+        entity.setExternalUnitId(domain.getUnitId());
+        entity.setEmailVerified(domain.isEmailVerified());
+        entity.setActive(domain.isActive());
+        entity.setMustChangePassword(domain.isMustChangePassword());
     }
 }

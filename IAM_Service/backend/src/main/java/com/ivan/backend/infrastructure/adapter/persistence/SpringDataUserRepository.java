@@ -5,9 +5,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.ivan.backend.domain.valueobject.UserRole;
 
 import java.util.UUID;
+import java.util.List;
 import java.util.Optional;
 
 public interface SpringDataUserRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByEmail(String email);
     Optional<UserEntity> findByRoleAndExternalOrganizationId(UserRole role, UUID externalOrganizationId);
+    List<UserEntity> findAllByExternalOrganizationId(UUID orgId);
+    List<UserEntity> findAllByExternalUnitId(UUID unitId);
+    List<UserEntity> findAllByExternalUnitIdAndExternalOrganizationId(UUID unitId, UUID orgId);
 }
