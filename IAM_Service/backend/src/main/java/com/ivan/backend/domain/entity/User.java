@@ -1,5 +1,6 @@
 package com.ivan.backend.domain.entity;
 
+import com.ivan.backend.domain.exception.DomainException;
 import com.ivan.backend.domain.valueobject.Email;
 import com.ivan.backend.domain.valueobject.UserRole;
 import lombok.Getter;
@@ -64,4 +65,33 @@ public class User {
         this.isActive = false;
     }
 
+    /**
+     * Active le compte utilisateur.
+     */
+    public void activate() {
+        this.isActive = true;
+    }
+
+    /**
+     * Vérifie si cet utilisateur (le créateur) a le droit d'en créer un autre.
+     */
+    public void validateCanCreate(UserRole targetRole, UUID targetTenantId, UUID targetUnitId) {
+        // 1. Règle de cloisonnement (Tenant/Centre)
+        if (!this.tenantId.equals(targetTenantId)) {
+            throw new DomainException("Interdit : Impossible de créer un utilisateur pour un autre centre.");
+        }
+
+        // 2. Règle de Hiérarchie
+        if (!this.role.isHigherThan(targetRole)) {
+            throw new DomainException("Interdit : Vous ne pouvez pas créer un rôle égal ou supérieur au vôtre.");
+        }
+
+        // 3. Règle de Scope (Unité/Sous-centre)
+        // Le CENTER_OWNER peut créer partout dans son centre (unitId peut être null ou
+        // non)
+        // Mais le UNIT_MANAGER et STAFF ne peuvent créer que dans leur PROPRE unité.
+        if (this.role != UserRole.CENTER_OWNER && (this.unitId == null || !this.unitId.equals(targetUnitId))) {
+            throw new DomainException("Interdit : Vous ne pouvez créer des membres que pour votre propre unité.");
+        }
+    }
 }

@@ -70,6 +70,13 @@ services:
       - SPRING_RABBITMQ_PASSWORD=guest
       - KEYCLOAK_CLIENT_SECRET=dQUkVayuw9cvTADJ1W7LFJfeVL5EvOTU 
       - KEYCLOAK_SERVER_URL=http://iam-keycloak:8080
+
+      # SOLUTION ISSUER : On dit au backend d'accepter "localhost" car c'est ce que le navigateur envoie
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/ExamsRealm
+      
+      # SOLUTION RÉSEAU : Le backend va quand même chercher les clés de validation via le réseau interne Docker
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://iam-keycloak:8080/realms/ExamsRealm/protocol/openid-connect/certs
+
     depends_on:
        iam-db:
          condition: service_healthy

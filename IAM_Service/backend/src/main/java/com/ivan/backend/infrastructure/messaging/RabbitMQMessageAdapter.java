@@ -3,6 +3,7 @@ package com.ivan.backend.infrastructure.messaging;
 import com.ivan.backend.domain.event.AccountLockedEvent;
 import com.ivan.backend.domain.event.OrganizationRegisteredEvent;
 import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
+import com.ivan.backend.domain.event.UserProvisionedEvent;
 import com.ivan.backend.domain.port.MessagePublisherPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,5 +45,14 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
                 RabbitMQConfig.EXCHANGE_NAME,
                 RabbitMQConfig.ROUTING_KEY_PASSWORD_RESET_REQUESTED,
                 event);
+    }
+
+    @Override
+    public void publishUserProvisioned(UserProvisionedEvent event) {
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_USER_PROVISIONED,
+                event);
+        log.info("Événement UserProvisioned publié pour : {}", event.email());
     }
 }

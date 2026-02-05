@@ -1,6 +1,7 @@
 package com.ivan.backend.presentation.v1.rest;
 
 import com.ivan.backend.domain.exception.AccountLockedException;
+import com.ivan.backend.domain.exception.DomainException;
 import com.ivan.backend.domain.exception.KeycloakIdentityException;
 import com.ivan.backend.domain.exception.UserAlreadyExistsException;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final String ERROR_KEY = "error";
+    private static final String TIMESTAMP = "timestamp";
 
     // --- EXCEPTIONS DOMAINE (Format Simple Map) ---
 
@@ -35,13 +37,13 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(ERROR_KEY, "Format invalide : " + ex.getMessage()));
     }
-    
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         String details = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        
+
         return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Validation echouée: " + details));
     }
 
@@ -53,17 +55,35 @@ public class GlobalExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         problemDetail.setTitle("Compte Verrouillé");
         problemDetail.setType(URI.create("https://api.exams.com/errors/account-locked"));
-        problemDetail.setProperty("timestamp", Instant.now());
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }
 
     @ExceptionHandler(KeycloakIdentityException.class)
     public ProblemDetail handleKeycloakException(KeycloakIdentityException ex) {
-        // Code 401 Unauthorized pour les mauvais identifiants
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Email ou mot de passe incorrect");
-        problemDetail.setTitle("Échec de l'authentification");
-        problemDetail.setType(URI.create("https://api.exams.com/errors/invalid-credentials"));
-        problemDetail.setProperty("timestamp", Instant.now());
+        // On utilise le VRAI message de l'exception au lieu d'un texte fixe
+        HttpStatus status = ex.getMessage().contains("identifiants") ? HttpStatus.UNAUTHORIZED
+                : HttpStatus.INTERNAL_SERVER_ERROR;
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, ex.getMessage());
+        problemDetail.setTitle("Erreur Service Identité");
+        problemDetail.setType(URI.create("https://api.exams.com/errors/identity-service-error"));
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
+
+        // Si on a une cause racine (ex: problème réseau Docker), on l'ajoute pour le
+        // debug
+        if (ex.getCause() != null) {
+            problemDetail.setProperty("debug_info", ex.getCause().getMessage());
+        }
+
+        return problemDetail;
+    }
+
+    @ExceptionHandler(DomainException.class)
+    public ProblemDetail handleDomainException(DomainException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problemDetail.setTitle("Violation des règles métier");
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }
 }

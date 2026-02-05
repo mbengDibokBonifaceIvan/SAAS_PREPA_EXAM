@@ -12,6 +12,7 @@ public class RabbitMQConfig {
     public static final String ROUTING_KEY_ORG_REGISTERED = "organization.registered";
     public static final String ROUTING_KEY_USER_LOCKED = "user.locked";
     public static final String ROUTING_KEY_PASSWORD_RESET_REQUESTED = "password.reset.requested";
+    public static final String ROUTING_KEY_USER_PROVISIONED = "user.provisioned";
     
     // Indispensable pour envoyer des objets Java en JSON
     @Bean

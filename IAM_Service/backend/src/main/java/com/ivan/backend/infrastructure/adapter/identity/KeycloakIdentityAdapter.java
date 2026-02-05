@@ -41,7 +41,7 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
 
     private final RestTemplate restTemplate;
 
-    @Value("${keycloak.auth-server-url}")
+    @Value("${keycloak.server-url}")
     private String authServerUrl;
 
     @Value("${keycloak.client-id}")
@@ -49,6 +49,8 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
 
     @Value("${keycloak.client-secret}")
     private String clientSecret;
+
+    private static final String UPDATE_PASSWORD = "UPDATE_PASSWORD";
 
     // --- IMPLEMENTATION IDENTITY MANAGER (Creation) ---
     @Override
@@ -69,7 +71,7 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
         // Si l'utilisateur doit changer son mot de passe (cas des employés créés par
         // l'owner)
         if (user.isMustChangePassword()) {
-            actions.add("UPDATE_PASSWORD");
+            actions.add(UPDATE_PASSWORD);
         }
 
         userRep.setRequiredActions(actions);
@@ -103,8 +105,13 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
                 assignRoleToUser(userId, user.getRole().name());
 
                 // Forcer l'envoi de l'email de vérification (nécessite SMTP configuré)
-                keycloak.realm(realm).users().get(userId).sendVerifyEmail();
-
+                // 'actions' contient déjà "VERIFY_EMAIL" et potentiellement "UPDATE_PASSWORD"
+                keycloak.realm(realm).users().get(userId).executeActionsEmail(actions);
+                log.info("Utilisateur créé et email d'actions envoyé à {}", user.getEmail().value());
+                
+            } else if (response.getStatus() == 409) {
+                // On lance une exception métier spécifique au lieu d'une erreur 500
+                throw new UserAlreadyExistsException(user.getEmail().value());
             } else {
                 // Gestion d'erreur plus précise (ex: utilisateur déjà existant)
                 throw new KeycloakIdentityException(
@@ -197,7 +204,7 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
 
         boolean isEmailVerified = kUser.isEmailVerified();
         boolean mustChangePassword = kUser.getRequiredActions() != null &&
-                kUser.getRequiredActions().contains("UPDATE_PASSWORD");
+                kUser.getRequiredActions().contains(UPDATE_PASSWORD);
 
         return new ProviderStatus(isEmailVerified, mustChangePassword);
     }
@@ -232,7 +239,7 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
             String userId = users.get(0).getId();
             // Action magique de Keycloak : génère le lien et envoie l'email
             keycloak.realm(realm).users().get(userId)
-                    .executeActionsEmail(List.of("UPDATE_PASSWORD"));
+                    .executeActionsEmail(List.of(UPDATE_PASSWORD));
         }
     }
 
