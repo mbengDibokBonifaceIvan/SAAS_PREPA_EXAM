@@ -10,12 +10,12 @@ import java.util.UUID;
 @Getter
 public class User {
     private final UUID id;
-    private final String firstName;
-    private final String lastName;
+    private String firstName;
+    private String lastName;
     private final Email email;
     private final UUID tenantId; // ID du centre
-    private final UUID unitId; // ID du sous centre (peut être null)
-    private final UserRole role;
+    private UUID unitId; // ID du sous centre (peut être null)
+    private UserRole role;
 
     // Champs de statut (Non-final car ils évoluent)
     private boolean emailVerified;
@@ -93,5 +93,42 @@ public class User {
         if (this.role != UserRole.CENTER_OWNER && (this.unitId == null || !this.unitId.equals(targetUnitId))) {
             throw new DomainException("Interdit : Vous ne pouvez créer des membres que pour votre propre unité.");
         }
+    }
+
+    /**
+     * Met à jour le profil de l'utilisateur.
+     * @param firstName
+     * @param lastName
+     */
+    public void updateProfile(String firstName, String lastName) {
+        if (firstName == null || firstName.isBlank()) {
+            throw new DomainException("Le prénom ne peut pas être vide.");
+        }
+        if (lastName == null || lastName.isBlank()) {
+            throw new DomainException("Le nom ne peut pas être vide.");
+        }
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    /**
+     * Change le rôle de l'utilisateur.
+     * @param newRole
+     * @param requesterId L'ID de celui qui demande le changement (pour éviter l'auto-modification)
+     */
+    public void changeRole(UserRole newRole, UUID requesterId) {
+        // Règle : Interdiction de modifier son propre rôle
+        if (this.id.equals(requesterId)) {
+            throw new DomainException("Sécurité : Vous ne pouvez pas modifier votre propre rôle.");
+        }
+        this.role = newRole;
+    }
+
+    /**
+     * 
+     * @param newUnitId
+     */
+    public void assignToUnit(UUID newUnitId) {
+        this.unitId = newUnitId;
     }
 }

@@ -1,10 +1,12 @@
 package com.ivan.backend.presentation.v1.rest;
 
 import com.ivan.backend.application.dto.ProvisionUserRequest;
+import com.ivan.backend.application.dto.UpdateUserRequest;
 import com.ivan.backend.application.dto.UserResponse;
 import com.ivan.backend.application.port.ManageAccountInputPort;
 import com.ivan.backend.application.port.ProvisionUserInputPort;
 import com.ivan.backend.application.usecase.SearchUserUseCase;
+import com.ivan.backend.application.usecase.UpdateUserUseCase;
 import com.ivan.backend.domain.entity.User;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class AccountManagementController {
     private final ProvisionUserInputPort provisionUserUseCase;
     private final ManageAccountInputPort manageAccountUseCase;
     private final SearchUserUseCase searchUserUseCase;
+    private final UpdateUserUseCase updateUserUseCase;
 
     private static final String EMAIL = "email";
 
@@ -105,4 +108,15 @@ public class AccountManagementController {
         User user = searchUserUseCase.getUserById(id, jwt.getClaimAsString(EMAIL));
         return ResponseEntity.ok(UserResponse.fromDomain(user));
     }
+
+    @PutMapping("/{id}")
+@PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER', 'STAFF_MEMBER')")
+public ResponseEntity<Void> updateUser(
+        @PathVariable UUID id,
+        @RequestBody UpdateUserRequest request,
+        @AuthenticationPrincipal Jwt jwt
+) {
+    updateUserUseCase.execute(id, jwt.getClaimAsString(EMAIL), request);
+    return ResponseEntity.noContent().build();
+}
 }

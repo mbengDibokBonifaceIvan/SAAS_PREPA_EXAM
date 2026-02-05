@@ -23,7 +23,7 @@ public class KeycloakInitializer implements CommandLineRunner {
     
     @Override
     public void run(String... args) {
-        List<String> roles = List.of("CENTER_OWNER", "MANAGER", "STAFF", "CANDIDATE");
+        List<String> roles = List.of("CENTER_OWNER", "UNIT_MANAGER", "STAFF_MEMBER", "CANDIDATE");
         
         roles.forEach(roleName -> {
             try {
