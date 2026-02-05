@@ -108,7 +108,7 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
                 // 'actions' contient déjà "VERIFY_EMAIL" et potentiellement "UPDATE_PASSWORD"
                 keycloak.realm(realm).users().get(userId).executeActionsEmail(actions);
                 log.info("Utilisateur créé et email d'actions envoyé à {}", user.getEmail().value());
-                
+
             } else if (response.getStatus() == 409) {
                 // On lance une exception métier spécifique au lieu d'une erreur 500
                 throw new UserAlreadyExistsException(user.getEmail().value());
@@ -240,6 +240,26 @@ public class KeycloakIdentityAdapter implements IdentityManagerPort, IdentityGat
             // Action magique de Keycloak : génère le lien et envoie l'email
             keycloak.realm(realm).users().get(userId)
                     .executeActionsEmail(List.of(UPDATE_PASSWORD));
+        }
+    }
+
+    @Override
+    public void disableIdentity(String email) {
+        updateUserEnabledStatus(email, false);
+    }
+
+    @Override
+    public void enableIdentity(String email) {
+        updateUserEnabledStatus(email, true);
+    }
+
+    private void updateUserEnabledStatus(String email, boolean enabled) {
+        List<UserRepresentation> users = keycloak.realm(realm).users().searchByEmail(email, true);
+        if (!users.isEmpty()) {
+            UserRepresentation user = users.get(0);
+            user.setEnabled(enabled);
+            keycloak.realm(realm).users().get(user.getId()).update(user);
+            log.info("Keycloak identity for {} set to enabled={}", email, enabled);
         }
     }
 

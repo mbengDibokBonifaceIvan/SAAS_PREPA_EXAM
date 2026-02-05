@@ -1,6 +1,7 @@
 package com.ivan.backend.presentation.v1.rest;
 
 import com.ivan.backend.application.dto.ProvisionUserRequest;
+import com.ivan.backend.application.port.ManageAccountInputPort;
 import com.ivan.backend.application.port.ProvisionUserInputPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,9 @@ import java.util.Map;
 public class AccountManagementController {
 
     private final ProvisionUserInputPort provisionUserUseCase;
+    private final ManageAccountInputPort manageAccountUseCase;
+
+    private static final String EMAIL = "email";
 
     /**
      * Endpoint pour provisionner un nouveau compte (Staff ou Candidat).
@@ -30,12 +34,33 @@ public class AccountManagementController {
             @AuthenticationPrincipal Jwt jwt // On récupère le JWT de celui qui appelle l'API
     ) {
         // L'email du créateur est généralement dans le claim 'sub' ou 'email' du JWT
-        String creatorEmail = jwt.getClaimAsString("email");
+        String creatorEmail = jwt.getClaimAsString(EMAIL);
 
         provisionUserUseCase.execute(request, creatorEmail);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-            "message", "Utilisateur provisionné avec succès. Un email d'activation lui a été envoyé."
-        ));
+                "message", "Utilisateur provisionné avec succès. Un email d'activation lui a été envoyé."));
+    }
+
+   @PatchMapping("/{email}/ban")
+    @PreAuthorize("hasRole('CENTER_OWNER')")
+    public ResponseEntity<Void> ban(
+            @PathVariable String email, 
+            @AuthenticationPrincipal Jwt jwt // <--- Utilise JWT ici
+    ) {
+        String ownerEmail = jwt.getClaimAsString(EMAIL); // On récupère le vrai email
+        manageAccountUseCase.banAccount(email, ownerEmail);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{email}/activate")
+    @PreAuthorize("hasRole('CENTER_OWNER')")
+    public ResponseEntity<Void> activate(
+            @PathVariable String email, 
+            @AuthenticationPrincipal Jwt jwt // <--- Et ici aussi
+    ) {
+        String ownerEmail = jwt.getClaimAsString(EMAIL);
+        manageAccountUseCase.activateAccount(email, ownerEmail);
+        return ResponseEntity.noContent().build();
     }
 }

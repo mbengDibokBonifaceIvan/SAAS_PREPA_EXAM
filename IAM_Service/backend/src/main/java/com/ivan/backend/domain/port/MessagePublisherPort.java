@@ -1,5 +1,7 @@
 package com.ivan.backend.domain.port;
 
+import com.ivan.backend.domain.event.AccountActivatedEvent;
+import com.ivan.backend.domain.event.AccountBannedEvent;
 import com.ivan.backend.domain.event.AccountLockedEvent;
 import com.ivan.backend.domain.event.OrganizationRegisteredEvent;
 import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
@@ -10,4 +12,6 @@ public interface MessagePublisherPort {
     void publishAccountLocked(AccountLockedEvent event);
     void publishPasswordResetRequested(PasswordResetRequestedEvent event);
     void publishUserProvisioned(UserProvisionedEvent event);
+    void publishAccountActivated(AccountActivatedEvent event);
+    void publishAccountBanned(AccountBannedEvent event);
 }

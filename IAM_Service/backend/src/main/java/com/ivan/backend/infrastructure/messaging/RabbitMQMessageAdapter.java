@@ -1,5 +1,7 @@
 package com.ivan.backend.infrastructure.messaging;
 
+import com.ivan.backend.domain.event.AccountActivatedEvent;
+import com.ivan.backend.domain.event.AccountBannedEvent;
 import com.ivan.backend.domain.event.AccountLockedEvent;
 import com.ivan.backend.domain.event.OrganizationRegisteredEvent;
 import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
@@ -54,5 +56,26 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
                 RabbitMQConfig.ROUTING_KEY_USER_PROVISIONED,
                 event);
         log.info("Événement UserProvisioned publié pour : {}", event.email());
+    }
+
+      @Override
+    public void publishAccountActivated(AccountActivatedEvent event) {
+        log.info("Publication de l'événement d'activation pour: {}", event.userEmail());
+        
+        rabbitTemplate.convertAndSend(
+            RabbitMQConfig.EXCHANGE_NAME,
+            RabbitMQConfig.ROUTING_KEY_ACCOUNT_ACTIVATED,
+            event
+        );
+    }
+
+    @Override
+    public void publishAccountBanned(AccountBannedEvent event) {
+        log.info("Publication de l'événement de bannissement pour: {}", event.userEmail());
+        rabbitTemplate.convertAndSend(
+            RabbitMQConfig.EXCHANGE_NAME,
+            RabbitMQConfig.ROUTING_KEY_ACCOUNT_BANNED,
+            event
+        );
     }
 }
