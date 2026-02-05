@@ -28,7 +28,6 @@ public class AccountManagementController {
     private final ManageAccountInputPort manageAccountUseCase;
     private final SearchUserUseCase searchUserUseCase;
 
-
     private static final String EMAIL = "email";
 
     /**
@@ -50,10 +49,10 @@ public class AccountManagementController {
                 "message", "Utilisateur provisionné avec succès. Un email d'activation lui a été envoyé."));
     }
 
-   @PatchMapping("/{email}/ban")
+    @PatchMapping("/{email}/ban")
     @PreAuthorize("hasRole('CENTER_OWNER')")
     public ResponseEntity<Void> ban(
-            @PathVariable String email, 
+            @PathVariable String email,
             @AuthenticationPrincipal Jwt jwt // <--- Utilise JWT ici
     ) {
         String ownerEmail = jwt.getClaimAsString(EMAIL); // On récupère le vrai email
@@ -64,7 +63,7 @@ public class AccountManagementController {
     @PatchMapping("/{email}/activate")
     @PreAuthorize("hasRole('CENTER_OWNER')")
     public ResponseEntity<Void> activate(
-            @PathVariable String email, 
+            @PathVariable String email,
             @AuthenticationPrincipal Jwt jwt // <--- Et ici aussi
     ) {
         String ownerEmail = jwt.getClaimAsString(EMAIL);
@@ -85,17 +84,25 @@ public class AccountManagementController {
     /**
      * UC8 & UC9: Récupérer l'annuaire selon mes droits
      */
-   @GetMapping("/directory")
-@PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER')")
-public ResponseEntity<List<UserResponse>> getDirectory(
-        @AuthenticationPrincipal Jwt jwt,
-        @RequestParam(required = false) UUID unitId // Paramètre optionnel : ?unitId=...
-) {
-    String email = jwt.getClaimAsString(EMAIL);
-    List<User> users = searchUserUseCase.getDirectory(email, unitId);
-    
-    return ResponseEntity.ok(users.stream()
-            .map(UserResponse::fromDomain)
-            .toList());
-}
+    @GetMapping("/directory")
+    @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER')")
+    public ResponseEntity<List<UserResponse>> getDirectory(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) UUID unitId // Paramètre optionnel : ?unitId=...
+    ) {
+        String email = jwt.getClaimAsString(EMAIL);
+        List<User> users = searchUserUseCase.getDirectory(email, unitId);
+
+        return ResponseEntity.ok(users.stream()
+                .map(UserResponse::fromDomain)
+                .toList());
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER')")
+    public ResponseEntity<UserResponse> getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        // Il faudra ajouter cette méthode dans ton UseCase
+        User user = searchUserUseCase.getUserById(id, jwt.getClaimAsString(EMAIL));
+        return ResponseEntity.ok(UserResponse.fromDomain(user));
+    }
 }

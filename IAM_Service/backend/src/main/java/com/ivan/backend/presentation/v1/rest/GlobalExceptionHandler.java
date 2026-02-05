@@ -87,5 +87,12 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
-    
+    @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
+    public ProblemDetail handleNotFound(jakarta.persistence.EntityNotFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problemDetail.setTitle("Ressource non trouvée");
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        return problemDetail;
+    }
+
 }

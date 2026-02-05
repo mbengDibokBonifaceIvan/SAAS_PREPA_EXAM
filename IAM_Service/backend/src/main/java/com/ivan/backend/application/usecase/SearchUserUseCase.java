@@ -8,6 +8,7 @@ import com.ivan.backend.domain.entity.User;
 import com.ivan.backend.domain.exception.DomainException;
 import com.ivan.backend.domain.repository.UserRepository;
 import com.ivan.backend.domain.valueobject.Email;
+import com.ivan.backend.domain.valueobject.UserRole;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -36,6 +37,33 @@ public class SearchUserUseCase {
         };
     }
 
+    @Transactional(readOnly = true)
+    public User getUserById(UUID id, String requesterEmail) {
+        User requester = findUserByEmail(requesterEmail);
+        User target = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé avec l'ID : " + id));
+
+        checkAccessRights(requester, target);
+        return target;
+    }
+
+    // Extraction de la logique de sécurité pour réutilisation
+    private void checkAccessRights(User requester, User target) {
+        if (!target.getTenantId().equals(requester.getTenantId())) {
+            throw new DomainException("Accès refusé : périmètre organisationnel différent");
+        }
+
+        if (requester.getRole() == UserRole.UNIT_MANAGER && 
+            (target.getUnitId() == null || !target.getUnitId().equals(requester.getUnitId()))) {
+            throw new DomainException("Accès refusé : cet utilisateur n'est pas dans votre unité");
+        }
+    }
+
+    private User findUserByEmail(String email) {
+        return userRepository.findByEmail(new Email(email))
+                .orElseThrow(() -> new EntityNotFoundException("Utilisateur inconnu : " + email));
+    }
+    
     @Transactional(readOnly = true)
     public User getUserProfile(String email) {
         return userRepository.findByEmail(new Email(email))

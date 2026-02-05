@@ -9,10 +9,12 @@ import com.ivan.backend.application.port.ManageAccountInputPort;
 import com.ivan.backend.domain.entity.User;
 import com.ivan.backend.domain.event.AccountActivatedEvent;
 import com.ivan.backend.domain.event.AccountBannedEvent;
+import com.ivan.backend.domain.exception.DomainException;
 import com.ivan.backend.domain.port.IdentityManagerPort;
 import com.ivan.backend.domain.port.MessagePublisherPort;
 import com.ivan.backend.domain.repository.UserRepository;
 import com.ivan.backend.domain.valueobject.Email;
+import com.ivan.backend.domain.valueobject.UserRole;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -66,9 +68,17 @@ public class ManageAccountUseCase implements ManageAccountInputPort {
         User user = userRepository.findByEmail(new Email(userEmail))
                 .orElseThrow(() -> new EntityNotFoundException("Utilisateur à gérer non trouvé"));
 
+        // 1. Isolation de l'organisation (Tenant)
         if (!user.getTenantId().equals(owner.getTenantId())) {
-            throw new SecurityException("Accès refusé : l'utilisateur n'appartient pas à votre organisation");
+            throw new DomainException("Violation de périmètre : l'utilisateur appartient à un autre centre");
         }
+
+        // 2. Isolation de l'unité (Pour les Managers uniquement)
+        if (owner.getRole() == UserRole.UNIT_MANAGER &&
+                (user.getUnitId() == null || !user.getUnitId().equals(owner.getUnitId()))) {
+            throw new DomainException("Accès refusé : vous ne pouvez gérer que les membres de votre sous-centre");
+        }
+
         return user;
     }
 }
