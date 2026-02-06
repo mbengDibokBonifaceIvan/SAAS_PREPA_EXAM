@@ -1,4 +1,4 @@
-package com.ivan.backend.domain.port;
+package com.ivan.backend.domain.port.out;
 
 import com.ivan.backend.domain.event.AccountActivatedEvent;
 import com.ivan.backend.domain.event.AccountBannedEvent;

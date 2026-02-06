@@ -8,10 +8,10 @@ import java.util.UUID;
 import java.util.List;
 import java.util.Optional;
 
-public interface SpringDataUserRepository extends JpaRepository<UserEntity, UUID> {
-    Optional<UserEntity> findByEmail(String email);
-    Optional<UserEntity> findByRoleAndExternalOrganizationId(UserRole role, UUID externalOrganizationId);
-    List<UserEntity> findAllByExternalOrganizationId(UUID orgId);
-    List<UserEntity> findAllByExternalUnitId(UUID unitId);
-    List<UserEntity> findAllByExternalUnitIdAndExternalOrganizationId(UUID unitId, UUID orgId);
+public interface SpringDataUserRepository extends JpaRepository<UserModel, UUID> {
+    Optional<UserModel> findByEmail(String email);
+    Optional<UserModel> findByRoleAndExternalOrganizationId(UserRole role, UUID externalOrganizationId);
+    List<UserModel> findAllByExternalOrganizationId(UUID orgId);
+    List<UserModel> findAllByExternalUnitId(UUID unitId);
+    List<UserModel> findAllByExternalUnitIdAndExternalOrganizationId(UUID unitId, UUID orgId);
 }

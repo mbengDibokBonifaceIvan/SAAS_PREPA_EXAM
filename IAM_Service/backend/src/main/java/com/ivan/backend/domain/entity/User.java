@@ -1,6 +1,6 @@
 package com.ivan.backend.domain.entity;
 
-import com.ivan.backend.domain.exception.DomainException;
+import com.ivan.backend.domain.exception.*;
 import com.ivan.backend.domain.valueobject.Email;
 import com.ivan.backend.domain.valueobject.UserRole;
 import lombok.Getter;
@@ -13,11 +13,10 @@ public class User {
     private String firstName;
     private String lastName;
     private final Email email;
-    private final UUID tenantId; // ID du centre
-    private UUID unitId; // ID du sous centre (peut être null)
+    private final UUID tenantId; 
+    private UUID unitId; 
     private UserRole role;
 
-    // Champs de statut (Non-final car ils évoluent)
     private boolean emailVerified;
     private boolean isActive;
     private boolean mustChangePassword;
@@ -41,9 +40,61 @@ public class User {
     // --- LOGIQUE MÉTIER ---
 
     /**
-     * Synchronise le statut d'activation basé sur la validation Keycloak.
-     * Si l'email est validé, on active automatiquement le compte.
+     * Centralise la vérification des droits de gestion d'un utilisateur sur un autre.
+     * Utilisé pour le bannissement, l'activation, et la modification de profil.
      */
+    public void checkCanManage(User target) {
+        // 1. Isolation Multi-tenant (Périmètre du centre)
+        if (!this.tenantId.equals(target.getTenantId())) {
+            throw new ResourceAccessDeniedException("Accès refusé : l'utilisateur appartient à un autre centre.");
+        }
+
+        // Autorisation si c'est soi-même
+        if (this.id.equals(target.getId())) return;
+
+        // 2. Règle de Hiérarchie
+        if (!this.role.isHigherThan(target.getRole())) {
+            throw new InsufficientPrivilegesException("Interdit : vous ne pouvez pas gérer un rang égal ou supérieur au vôtre.");
+        }
+
+        // 3. Règle de Scope (Unité/Sous-centre)
+        if (this.role != UserRole.CENTER_OWNER && (this.unitId == null || !this.unitId.equals(target.getUnitId()))) {
+            throw new ResourceAccessDeniedException("Interdit : cet utilisateur n'appartient pas à votre unité.");
+        }
+    }
+
+    public void validateCanCreate(UserRole targetRole, UUID targetTenantId, UUID targetUnitId) {
+        if (!this.tenantId.equals(targetTenantId)) {
+            throw new ResourceAccessDeniedException("Interdit : Impossible de créer un utilisateur pour un autre centre.");
+        }
+
+        if (!this.role.isHigherThan(targetRole)) {
+            throw new InsufficientPrivilegesException("Interdit : Vous ne pouvez pas créer un rôle égal ou supérieur au vôtre.");
+        }
+
+        if (this.role != UserRole.CENTER_OWNER && (this.unitId == null || !this.unitId.equals(targetUnitId))) {
+            throw new ResourceAccessDeniedException("Interdit : Vous ne pouvez créer des membres que pour votre propre unité.");
+        }
+    }
+
+    public void updateProfile(String firstName, String lastName) {
+        if (firstName == null || firstName.isBlank()) {
+            throw new BusinessRuleViolationException("Le prénom ne peut pas être vide.");
+        }
+        if (lastName == null || lastName.isBlank()) {
+            throw new BusinessRuleViolationException("Le nom ne peut pas être vide.");
+        }
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    public void changeRole(UserRole newRole, UUID requesterId) {
+        if (this.id.equals(requesterId)) {
+            throw new InsufficientPrivilegesException("Sécurité : Vous ne pouvez pas modifier votre propre rôle.");
+        }
+        this.role = newRole;
+    }
+
     public void syncValidationStatus(boolean isEmailVerifiedInProvider) {
         if (isEmailVerifiedInProvider) {
             this.emailVerified = true;
@@ -51,83 +102,18 @@ public class User {
         }
     }
 
-    /**
-     * Définit si l'utilisateur doit changer son mot de passe au prochain login.
-     */
     public void updatePasswordRequirement(boolean required) {
         this.mustChangePassword = required;
     }
 
-    /**
-     * Désactive le compte utilisateur.
-     */
     public void deactivate() {
         this.isActive = false;
     }
 
-    /**
-     * Active le compte utilisateur.
-     */
     public void activate() {
         this.isActive = true;
     }
 
-    /**
-     * Vérifie si cet utilisateur (le créateur) a le droit d'en créer un autre.
-     */
-    public void validateCanCreate(UserRole targetRole, UUID targetTenantId, UUID targetUnitId) {
-        // 1. Règle de cloisonnement (Tenant/Centre)
-        if (!this.tenantId.equals(targetTenantId)) {
-            throw new DomainException("Interdit : Impossible de créer un utilisateur pour un autre centre.");
-        }
-
-        // 2. Règle de Hiérarchie
-        if (!this.role.isHigherThan(targetRole)) {
-            throw new DomainException("Interdit : Vous ne pouvez pas créer un rôle égal ou supérieur au vôtre.");
-        }
-
-        // 3. Règle de Scope (Unité/Sous-centre)
-        // Le CENTER_OWNER peut créer partout dans son centre (unitId peut être null ou
-        // non)
-        // Mais le UNIT_MANAGER et STAFF ne peuvent créer que dans leur PROPRE unité.
-        if (this.role != UserRole.CENTER_OWNER && (this.unitId == null || !this.unitId.equals(targetUnitId))) {
-            throw new DomainException("Interdit : Vous ne pouvez créer des membres que pour votre propre unité.");
-        }
-    }
-
-    /**
-     * Met à jour le profil de l'utilisateur.
-     * @param firstName
-     * @param lastName
-     */
-    public void updateProfile(String firstName, String lastName) {
-        if (firstName == null || firstName.isBlank()) {
-            throw new DomainException("Le prénom ne peut pas être vide.");
-        }
-        if (lastName == null || lastName.isBlank()) {
-            throw new DomainException("Le nom ne peut pas être vide.");
-        }
-        this.firstName = firstName;
-        this.lastName = lastName;
-    }
-
-    /**
-     * Change le rôle de l'utilisateur.
-     * @param newRole
-     * @param requesterId L'ID de celui qui demande le changement (pour éviter l'auto-modification)
-     */
-    public void changeRole(UserRole newRole, UUID requesterId) {
-        // Règle : Interdiction de modifier son propre rôle
-        if (this.id.equals(requesterId)) {
-            throw new DomainException("Sécurité : Vous ne pouvez pas modifier votre propre rôle.");
-        }
-        this.role = newRole;
-    }
-
-    /**
-     * 
-     * @param newUnitId
-     */
     public void assignToUnit(UUID newUnitId) {
         this.unitId = newUnitId;
     }

@@ -9,7 +9,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 @Getter @Setter
-public class UserEntity {
+public class UserModel extends AuditableModel { // Héritage de l'audit
 
     @Id
     private UUID userId;
@@ -17,11 +17,11 @@ public class UserEntity {
     private String firstName;
     private String lastName;
     
-    @Column(unique = true)
+    @Column(unique = true, nullable = false)
     private String email;
 
     @Enumerated(EnumType.STRING)
-    private UserRole role; // On simplifie l'enum pour l'instant
+    private UserRole role;
 
     private UUID externalOrganizationId;
     private UUID externalUnitId = null;
@@ -29,10 +29,6 @@ public class UserEntity {
     private boolean isActive = false;
     private boolean mustChangePassword = false;
     private boolean isEmailVerified = false;
-    
-    // Audit simple (Toujours utile en base de données)
-    private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
-    private java.time.LocalDateTime updatedAt = java.time.LocalDateTime.now();
 
-    // PasswordReset, RefreshToken et AuditLog seront des entités liées (OneToMany) plus tard
+    // PLUS BESOIN de createdAt/updatedAt ici, ils sont dans AuditableModel
 }

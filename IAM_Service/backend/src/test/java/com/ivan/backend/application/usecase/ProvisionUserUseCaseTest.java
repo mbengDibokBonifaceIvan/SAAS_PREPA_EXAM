@@ -2,13 +2,16 @@ package com.ivan.backend.application.usecase;
 
 import com.ivan.backend.application.dto.ProvisionUserRequest;
 import com.ivan.backend.domain.entity.User;
-import com.ivan.backend.domain.exception.DomainException;
-import com.ivan.backend.domain.port.IdentityManagerPort;
-import com.ivan.backend.domain.port.MessagePublisherPort;
+import com.ivan.backend.domain.event.UserProvisionedEvent;
+import com.ivan.backend.domain.exception.UserAlreadyExistsException;
+import com.ivan.backend.domain.port.out.IdentityManagerPort;
+import com.ivan.backend.domain.port.out.MessagePublisherPort;
 import com.ivan.backend.domain.repository.UserRepository;
 import com.ivan.backend.domain.valueobject.Email;
 import com.ivan.backend.domain.valueobject.UserRole;
-import org.junit.jupiter.api.BeforeEach;
+
+import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,10 +21,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.springframework.test.context.ActiveProfiles;
 
+@ActiveProfiles("test")
 @ExtendWith(MockitoExtension.class)
 class ProvisionUserUseCaseTest {
 
@@ -29,47 +34,67 @@ class ProvisionUserUseCaseTest {
     @Mock private IdentityManagerPort identityManagerPort;
     @Mock private MessagePublisherPort messagePublisher;
 
-    @InjectMocks private ProvisionUserUseCase useCase;
+    @InjectMocks
+    private ProvisionUserUseCase provisionUserUseCase;
 
-    private User owner;
-    private UUID tenantId = UUID.randomUUID();
+    @Test
+    @DisplayName("Provisioning : succès quand le créateur a les droits")
+    void shouldProvisionUserSuccessfully() {
+        // GIVEN
+        String creatorEmail = "admin@tenant.com";
+        UUID tenantId = UUID.randomUUID();
+        UUID unitId = UUID.randomUUID();
+        
+        ProvisionUserRequest request = new ProvisionUserRequest(
+                "New", "User", "new@test.com", UserRole.CANDIDATE, unitId
+        );
 
-    @BeforeEach
-    void setUp() {
-        owner = new User(UUID.randomUUID(), "Owner", "Boss", new Email("owner@test.com"),
-                tenantId, null, UserRole.CENTER_OWNER, true, true, false);
+        User creator = mock(User.class);
+        when(creator.getTenantId()).thenReturn(tenantId);
+
+        when(userRepository.findByEmail(new Email("new@test.com"))).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(new Email(creatorEmail))).thenReturn(Optional.of(creator));
+
+        // WHEN
+        provisionUserUseCase.execute(request, creatorEmail);
+
+        // THEN
+        // Vérifie la validation des droits
+        verify(creator).validateCanCreate(UserRole.CANDIDATE, tenantId, unitId);
+        
+        // Vérifie les appels d'infrastructure
+        verify(identityManagerPort).createIdentity(any(User.class), anyString());
+        verify(userRepository).save(any(User.class));
+        verify(messagePublisher).publishUserProvisioned(any(UserProvisionedEvent.class));
     }
 
     @Test
-    void should_provision_user_successfully() {
-        // Given
-        ProvisionUserRequest request = new ProvisionUserRequest(
-                "John", "Doe", "john@test.com", UserRole.STAFF_MEMBER, UUID.randomUUID());
+    @DisplayName("Provisioning : devrait échouer si l'email cible existe déjà")
+    void shouldThrowExceptionWhenUserAlreadyExists() {
+        // GIVEN
+        String targetEmail = "existing@test.com";
+        ProvisionUserRequest request = new ProvisionUserRequest("A", "B", targetEmail, UserRole.CANDIDATE, UUID.randomUUID());
         
-        when(userRepository.findByEmail(any())).thenReturn(Optional.of(owner));
+        when(userRepository.findByEmail(new Email(targetEmail))).thenReturn(Optional.of(mock(User.class)));
 
-        // When
-        useCase.execute(request, "owner@test.com");
-
-        // Then
-        verify(identityManagerPort).createIdentity(any(), anyString());
-        verify(userRepository).save(any());
-        verify(messagePublisher).publishUserProvisioned(any());
+        // WHEN & THEN
+        assertThrows(UserAlreadyExistsException.class, () -> provisionUserUseCase.execute(request, "any@mail.com"));
+        
+        verify(userRepository, times(1)).findByEmail(any(Email.class));
+        verifyNoMoreInteractions(identityManagerPort, messagePublisher);
     }
 
     @Test
-    void should_fail_when_creator_has_lower_role() {
-        // Given: Un Staff essaie de créer un Owner (Interdit)
-        User staff = new User(UUID.randomUUID(), "Staff", "S", new Email("staff@test.com"),
-                tenantId, null, UserRole.STAFF_MEMBER, true, true, false);
-        
-        ProvisionUserRequest request = new ProvisionUserRequest(
-                "Boss", "B", "boss@test.com", UserRole.CENTER_OWNER, null);
-        
-        when(userRepository.findByEmail(any())).thenReturn(Optional.of(staff));
+    @DisplayName("Provisioning : devrait échouer si le créateur est inconnu")
+    void shouldThrowExceptionWhenCreatorNotFound() {
+        // GIVEN
+        String creatorEmail = "ghost@test.com";
+        ProvisionUserRequest request = new ProvisionUserRequest("A", "B", "new@test.com", UserRole.CANDIDATE, UUID.randomUUID());
 
-        // When & Then
-        assertThrows(DomainException.class, () -> useCase.execute(request, "staff@test.com"));
-        verifyNoInteractions(identityManagerPort);
+        when(userRepository.findByEmail(new Email("new@test.com"))).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(new Email(creatorEmail))).thenReturn(Optional.empty());
+
+        // WHEN & THEN
+        assertThrows(EntityNotFoundException.class, () -> provisionUserUseCase.execute(request, creatorEmail));
     }
 }

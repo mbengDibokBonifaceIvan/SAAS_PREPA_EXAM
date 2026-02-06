@@ -2,7 +2,9 @@ package com.ivan.backend.domain.valueobject;
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.ActiveProfiles;
 
+@ActiveProfiles("test")
 class EmailTest {
 
     @Test

@@ -1,7 +1,7 @@
-package com.ivan.backend.infrastructure.messaging;
+package com.ivan.backend.infrastructure.config;
 
 import org.springframework.amqp.core.TopicExchange;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,10 +16,9 @@ public class RabbitMQConfig {
     public static final String ROUTING_KEY_ACCOUNT_ACTIVATED = "account.activated";
     public static final String ROUTING_KEY_ACCOUNT_BANNED = "account.banned";
     
-    // Indispensable pour envoyer des objets Java en JSON
     @Bean
-    public Jackson2JsonMessageConverter producerJackson2MessageConverter() {
-        return new Jackson2JsonMessageConverter();
+    public JacksonJsonMessageConverter producerJackson2MessageConverter() {
+        return new JacksonJsonMessageConverter();
     }
 
     @Bean

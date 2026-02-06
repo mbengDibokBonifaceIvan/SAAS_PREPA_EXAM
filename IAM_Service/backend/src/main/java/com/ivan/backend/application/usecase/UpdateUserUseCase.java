@@ -2,11 +2,14 @@ package com.ivan.backend.application.usecase;
 
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ivan.backend.application.dto.UpdateUserRequest;
+import com.ivan.backend.application.port.in.UpdateUserInputPort;
 import com.ivan.backend.domain.entity.User;
-import com.ivan.backend.domain.exception.DomainException;
+import com.ivan.backend.domain.exception.InsufficientPrivilegesException;
+import com.ivan.backend.domain.port.out.IdentityManagerPort;
 import com.ivan.backend.domain.repository.UserRepository;
 import com.ivan.backend.domain.valueobject.Email;
 import com.ivan.backend.domain.valueobject.UserRole;
@@ -16,65 +19,59 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class UpdateUserUseCase {
+@Slf4j
+public class UpdateUserUseCase implements UpdateUserInputPort {
 
     private final UserRepository userRepository;
+    private final IdentityManagerPort identityManagerPort;
 
+    @Override
     @Transactional
     public void execute(UUID targetId, String requesterEmail, UpdateUserRequest request) {
         User requester = userRepository.findByEmail(new Email(requesterEmail))
-                .orElseThrow(() -> new EntityNotFoundException("Demandeur inconnu"));
-        
+                .orElseThrow(() -> new EntityNotFoundException("Demandeur inconnu : " + requesterEmail));
+
         User target = userRepository.findById(targetId)
-                .orElseThrow(() -> new EntityNotFoundException("Cible inconnue"));
+                .orElseThrow(() -> new EntityNotFoundException("Cible inconnue (ID: " + targetId + ")"));
 
-        // 1. Sécurité transversale
-        validateTenantAccess(requester, target);
+        // 1. Validation de sécurité centralisée dans le Domaine
+        // Gère l'isolation du centre, l'unité et la hiérarchie.
+        requester.checkCanManage(target);
 
-        // 2. Mise à jour des informations de profil
-        updateBasicInfo(requester, target, request);
+        // 2. Mise à jour des informations de base (Profil)
+        updateProfileInfo(target, request);
 
-        // 3. Mise à jour des privilèges administratifs
-        updateAdministrativeInfo(requester, target, request);
+        // 3. Mise à jour administrative (Rôles & Unités)
+        if (request.role() != null || request.unitId() != null) {
+            handleAdministrativeUpdates(requester, target, request);
+        }
 
         userRepository.save(target);
+        log.info("Mise à jour réussie de l'utilisateur {} par {}", target.getEmail().value(), requesterEmail);
     }
 
-    private void validateTenantAccess(User requester, User target) {
-        if (!target.getTenantId().equals(requester.getTenantId())) {
-            throw new DomainException("Accès refusé : Autre organisation.");
-        }
-    }
-
-    private void updateBasicInfo(User requester, User target, UpdateUserRequest request) {
-        // Vérification des droits de modification
-        boolean isSelf = target.getId().equals(requester.getId());
-        boolean isSuperior = requester.getRole().isHigherThan(target.getRole());
-
-        if (!isSelf && !isSuperior) {
-            throw new DomainException("Vous n'avez pas le droit de modifier ce profil.");
-        }
-
-        // Fusion intelligente des données
+    private void updateProfileInfo(User target, UpdateUserRequest request) {
         String firstName = (request.firstName() != null) ? request.firstName() : target.getFirstName();
         String lastName = (request.lastName() != null) ? request.lastName() : target.getLastName();
-        
+
+        // validateProfile (DomainException si vide)
         target.updateProfile(firstName, lastName);
     }
 
-    private void updateAdministrativeInfo(User requester, User target, UpdateUserRequest request) {
-        // Si aucun champ admin n'est présent, on sort
-        if (request.role() == null && request.unitId() == null) return;
-
-        // Seul l'Owner peut toucher à ça
+    private void handleAdministrativeUpdates(User requester, User target, UpdateUserRequest request) {
+        // Seul l'Owner a le droit de modifier les structures
         if (requester.getRole() != UserRole.CENTER_OWNER) {
-            throw new DomainException("Seul le Chef de Centre peut modifier les rôles ou unités.");
+            throw new InsufficientPrivilegesException("Seul le Chef de Centre peut modifier les rôles ou les unités.");
         }
 
+        // Changement de Rôle
         if (request.role() != null) {
             target.changeRole(request.role(), requester.getId());
+            // Synchronisation avec Keycloak
+            identityManagerPort.updateUserRole(target.getEmail().value(), request.role().name());
         }
-        
+
+        // Changement d'Unité (Sous-centre)
         if (request.unitId() != null) {
             target.assignToUnit(request.unitId());
         }

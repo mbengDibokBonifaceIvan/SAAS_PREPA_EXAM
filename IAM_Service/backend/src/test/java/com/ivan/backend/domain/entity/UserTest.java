@@ -1,15 +1,111 @@
 package com.ivan.backend.domain.entity;
 
+import com.ivan.backend.domain.exception.BusinessRuleViolationException;
+import com.ivan.backend.domain.exception.InsufficientPrivilegesException;
+import com.ivan.backend.domain.exception.ResourceAccessDeniedException;
 import com.ivan.backend.domain.valueobject.Email;
 import com.ivan.backend.domain.valueobject.UserRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Nested;
 
+@ActiveProfiles("test")
 class UserTest {
+
+    private final UUID tenant1 = UUID.randomUUID();
+    private final UUID tenant2 = UUID.randomUUID();
+    private final UUID unit1 = UUID.randomUUID();
+    private final UUID unit2 = UUID.randomUUID();
+
+    @Nested
+    @DisplayName("Vérification des droits (checkCanManage)")
+    class CheckCanManageTests {
+
+        @Test
+        @DisplayName("Devrait rejeter si les centres (tenants) sont différents")
+        void shouldRejectDifferentTenants() {
+            User requester = createUser(tenant1, unit1, UserRole.CENTER_OWNER);
+            User target = createUser(tenant2, unit1, UserRole.CANDIDATE);
+
+            assertThrows(ResourceAccessDeniedException.class, () -> requester.checkCanManage(target));
+        }
+
+        @Test
+        @DisplayName("Un manager ne devrait pas pouvoir gérer un autre manager (rang égal)")
+        void shouldRejectEqualRole() {
+            User manager1 = createUser(tenant1, unit1, UserRole.UNIT_MANAGER);
+            User manager2 = createUser(tenant1, unit1, UserRole.UNIT_MANAGER);
+
+            assertThrows(InsufficientPrivilegesException.class, () -> manager1.checkCanManage(manager2));
+        }
+
+        @Test
+        @DisplayName("Un manager ne devrait pas pouvoir gérer quelqu'un d'une autre unité")
+        void shouldRejectDifferentUnitForManager() {
+            User manager = createUser(tenant1, unit1, UserRole.UNIT_MANAGER);
+            User target = createUser(tenant1, unit2, UserRole.CANDIDATE);
+
+            assertThrows(ResourceAccessDeniedException.class, () -> manager.checkCanManage(target));
+        }
+
+        @Test
+        @DisplayName("L'Owner du centre peut gérer n'importe qui dans son centre, peu importe l'unité")
+        void shouldAllowOwnerEverywhereInTenant() {
+            User owner = createUser(tenant1, unit1, UserRole.CENTER_OWNER);
+            User target = createUser(tenant1, unit2, UserRole.CANDIDATE);
+
+            assertDoesNotThrow(() -> owner.checkCanManage(target));
+        }
+
+        @Test
+        @DisplayName("Un utilisateur peut toujours se gérer lui-même")
+        void shouldAllowSelfManagement() {
+            User user = createUser(tenant1, unit1, UserRole.CANDIDATE);
+            assertDoesNotThrow(() -> user.checkCanManage(user));
+        }
+    }
+
+    @Nested
+    @DisplayName("Mises à jour du profil")
+    class ProfileTests {
+        @Test
+        @DisplayName("Devrait mettre à jour le nom et prénom si valides")
+        void shouldUpdateProfile() {
+            User user = createUser(tenant1, unit1, UserRole.CANDIDATE);
+            user.updateProfile("Jean", "Dupont");
+
+            assertEquals("Jean", user.getFirstName());
+            assertEquals("Dupont", user.getLastName());
+        }
+
+        @Test
+        @DisplayName("Devrait échouer si le prénom est vide")
+        void shouldFailWhenFirstNameIsEmpty() {
+            User user = createUser(tenant1, unit1, UserRole.CANDIDATE);
+            assertThrows(BusinessRuleViolationException.class, () -> user.updateProfile("", "Dupont"));
+        }
+    }
+
+    @Test
+    @DisplayName("Sécurité : un utilisateur ne peut pas changer son propre rôle")
+    void shouldNotAllowSelfRoleChange() {
+        User owner = createUser(tenant1, unit1, UserRole.CENTER_OWNER);
+        UUID ownerId = owner.getId(); // On prépare l'ID à l'extérieur
+
+        assertThrows(InsufficientPrivilegesException.class, () -> owner.changeRole(UserRole.CANDIDATE, ownerId));
+    }
+
+    // Helper pour créer rapidement un utilisateur
+    private User createUser(UUID tenantId, UUID unitId, UserRole role) {
+        return new User(
+                UUID.randomUUID(), "Test", "User", new Email("test@test.com"),
+                tenantId, unitId, role, true, true, false);
+    }
 
     @Test
     @DisplayName("Le compte doit s'activer quand l'email est vérifié par le provider")
@@ -58,16 +154,17 @@ class UserTest {
     // Helper pour créer un utilisateur de base pour les tests
     private User createPendingUser() {
         return new User(
-            UUID.randomUUID(),
-            "Ivan",
-            "D",
-            new Email("test@example.com"),
-            UUID.randomUUID(),
-            null,
-            UserRole.CENTER_OWNER,
-            false, // emailVerified
-            false, // isActive
-            false  // mustChangePassword
+                UUID.randomUUID(),
+                "Ivan",
+                "D",
+                new Email("test@example.com"),
+                UUID.randomUUID(),
+                null,
+                UserRole.CENTER_OWNER,
+                false, // emailVerified
+                false, // isActive
+                false // mustChangePassword
         );
     }
+
 }

@@ -36,7 +36,8 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
     container_name: iam-keycloak
-    command: start-dev --http-enabled=true # Force le HTTP pour le dev
+    # On ajoute --hostname pour forcer l'identité du serveur
+    command: start-dev --http-enabled=true --hostname=localhost
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://iam-db:5432/keycloak_db
@@ -48,6 +49,13 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HEALTH_ENABLED: "true"
       KC_HOSTNAME_DEBUG: "true"
+      KC_HOSTNAME_URL: http://localhost:8080
+      # On force Keycloak à toujours se considérer comme localhost:8080
+      KC_HOSTNAME: localhost
+      # Cette commande force l'import au démarrage
+     # KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+    #volumes:
+     # - ./realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
       - "8080:8080"
     depends_on:
@@ -68,7 +76,7 @@ services:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
-      - KEYCLOAK_CLIENT_SECRET=dQUkVayuw9cvTADJ1W7LFJfeVL5EvOTU 
+      - KEYCLOAK_CLIENT_SECRET=k2jrL3KQ0lNNY3VF8sZxLQ3azw0FUi36 
       - KEYCLOAK_SERVER_URL=http://iam-keycloak:8080
 
       # SOLUTION ISSUER : On dit au backend d'accepter "localhost" car c'est ce que le navigateur envoie

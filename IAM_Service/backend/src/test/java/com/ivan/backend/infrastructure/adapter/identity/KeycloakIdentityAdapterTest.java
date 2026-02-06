@@ -3,186 +3,151 @@ package com.ivan.backend.infrastructure.adapter.identity;
 import com.ivan.backend.domain.entity.User;
 import com.ivan.backend.domain.valueobject.AuthToken;
 import com.ivan.backend.domain.valueobject.Email;
-import com.ivan.backend.domain.valueobject.ProviderStatus;
 import com.ivan.backend.domain.valueobject.UserRole;
-
-import jakarta.ws.rs.core.Response;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.admin.client.Keycloak;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
-
-import java.net.URI;
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
-
 import org.keycloak.admin.client.resource.*;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.mockito.Answers;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
-// Pour le test RestTemplate / MockRestServiceServer
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
-import static org.hamcrest.Matchers.containsString;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import jakarta.ws.rs.core.Response;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@ActiveProfiles("test")
 class KeycloakIdentityAdapterTest {
 
-    @Mock
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
     private Keycloak keycloak;
 
-   // RestTemplate DOIT être une vraie instance pour MockRestServiceServer
-    private RestTemplate restTemplate = new RestTemplate();
-
     @Mock
-    private RealmResource realmResource;
-
-    @Mock
-    private UsersResource usersResource;
+    private RestTemplate restTemplate;
 
     @InjectMocks
     private KeycloakIdentityAdapter adapter;
 
-    @Autowired
-    private MockRestServiceServer server;
-
     @BeforeEach
-    void setup() {
-        // Manuellement injecter le vrai RestTemplate dans l'adapter
-        ReflectionTestUtils.setField(adapter, "restTemplate", restTemplate);
-
-        // On injecte manuellement la valeur de la propriété @Value("${keycloak.realm}")
+    void setUp() {
+        // Injection des @Value manuellement pour le test unitaire
         ReflectionTestUtils.setField(adapter, "realm", "ExamsRealm");
+        ReflectionTestUtils.setField(adapter, "authServerUrl", "http://localhost:8080");
         ReflectionTestUtils.setField(adapter, "clientId", "iam-client");
-        ReflectionTestUtils.setField(adapter, "clientSecret", "secret");
-
-        // On utilise lenient() pour éviter l'exception dans le test d'authentification
-        // On simule la cascade d'appels : keycloak.realm("...").users()
-        lenient().when(keycloak.realm(anyString())).thenReturn(realmResource);
-        lenient().when(realmResource.users()).thenReturn(usersResource);
-
-        // On crée le serveur basé sur la VRAIE instance
-        server = MockRestServiceServer.createServer(restTemplate);    }
-
-    @Test
-    @DisplayName("Devrait créer une identité dans Keycloak et envoyer l'email de vérification")
-    void should_call_keycloak_api_to_create_user() {
-        // GIVEN
-        User user = new User(
-                UUID.randomUUID(),
-                "Ivan",
-                "D",
-                new Email("ivan@test.com"),
-                UUID.randomUUID(),
-                null,
-                UserRole.CENTER_OWNER,
-                false,
-                false,
-                true
-
-        );
-
-        // CRUCIAL : URI retournée par Keycloak dans le header Location
-        URI userUri = URI.create(
-                "http://localhost:8080/admin/realms/ExamsRealm/users/" + UUID.randomUUID());
-
-        Response mockResponse = Response.status(Response.Status.CREATED)
-                .location(userUri)
-                .build();
-
-        when(usersResource.create(any())).thenReturn(mockResponse);
-
-        // On mock également l'appel sendVerifyEmail et l'assignation de rôle pour
-        // éviter d'autres NPE
-        UserResource userResourceMock = mock(UserResource.class);
-        RoleMappingResource roleMappingResourceMock = mock(RoleMappingResource.class);
-        RoleScopeResource roleScopeResourceMock = mock(RoleScopeResource.class);
-        RoleResource roleResourceMock = mock(RoleResource.class);
-        RolesResource rolesResourceMock = mock(RolesResource.class);
-
-        when(usersResource.get(anyString())).thenReturn(userResourceMock);
-        when(userResourceMock.roles()).thenReturn(roleMappingResourceMock);
-        when(roleMappingResourceMock.realmLevel()).thenReturn(roleScopeResourceMock);
-
-        // Mock pour la récupération du rôle
-        when(realmResource.roles()).thenReturn(rolesResourceMock);
-        when(rolesResourceMock.get(anyString())).thenReturn(roleResourceMock);
-        when(roleResourceMock.toRepresentation()).thenReturn(new RoleRepresentation());
-
-        // WHEN & THEN
-        assertDoesNotThrow(() -> adapter.createIdentity(user, "password123"));
-
-        verify(usersResource, times(1)).create(any());
-        verify(userResourceMock, times(1)).sendVerifyEmail();
     }
 
-   @Test
-@DisplayName("Devrait retourner un token valide lors d'une authentification réussie")
-void should_return_auth_token_on_successful_authentication(){
-    // GIVEN
-    String responseJson = "{\"access_token\":\"fake-jwt-token\",\"refresh_token\":\"fake-refresh-token\",\"expires_in\":3600}";
+    @Test
+    @DisplayName("CreateIdentity : devrait créer l'utilisateur et assigner le rôle")
+    void shouldCreateIdentitySuccessfully() {
+        // 1. GIVEN - Données
+        User user = new User(UUID.randomUUID(), "Ivan", "Test", new Email("ivan@test.com"),
+                UUID.randomUUID(), UUID.randomUUID(), UserRole.CENTER_OWNER, false, true, true);
+        String userId = "user-id-123";
 
-    server.expect(requestTo(containsString("/protocol/openid-connect/token")))
-          .andExpect(method(HttpMethod.POST))
-          .andRespond(withSuccess(responseJson, org.springframework.http.MediaType.APPLICATION_JSON));
+        // 2. Mock de la Réponse JAX-RS (Creation)
+        Response response = mock(Response.class);
+        when(response.getStatus()).thenReturn(201);
+        when(response.getLocation()).thenReturn(URI.create("http://keycloak/users/" + userId));
 
-    // WHEN
-    AuthToken result = adapter.authenticate("ivan@test.com", "password123");
+        // 3. Mock de la hiérarchie pour le Rôle
+        RoleResource roleResource = mock(RoleResource.class);
+        RoleRepresentation roleRep = new RoleRepresentation();
+        roleRep.setName("CENTER_OWNER");
+        when(keycloak.realm(anyString()).roles().get(anyString())).thenReturn(roleResource);
+        when(roleResource.toRepresentation()).thenReturn(roleRep);
 
-    // THEN
-    assertNotNull(result);
-    assertEquals("fake-jwt-token", result.accessToken());
-    server.verify();
-}
+        // 4. FIX: Mock de la hiérarchie pour l'utilisateur (UsersResource ->
+        // UserResource)
+        UsersResource usersResource = mock(UsersResource.class);
+        UserResource userResource = mock(UserResource.class); // C'est lui qui manquait !
+        RoleMappingResource roleMappingResource = mock(RoleMappingResource.class);
+        RoleScopeResource roleScopeResource = mock(RoleScopeResource.class);
+
+        when(keycloak.realm(anyString()).users()).thenReturn(usersResource);
+        when(usersResource.create(any(UserRepresentation.class))).thenReturn(response);
+
+        // On lie l'ID extrait au mock userResource
+        when(usersResource.get(userId)).thenReturn(userResource);
+
+        // On lie le chemin pour assignRoleToUser : .roles().realmLevel()
+        when(userResource.roles()).thenReturn(roleMappingResource);
+        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
+
+        // 5. WHEN
+        assertDoesNotThrow(() -> adapter.createIdentity(user, "temp-password"));
+
+        // 6. THEN
+        verify(usersResource).create(any(UserRepresentation.class));
+        verify(roleScopeResource).add(anyList()); // Vérifie l'ajout du rôle
+        verify(userResource).executeActionsEmail(anyList()); // Vérifie l'envoi du mail
+    }
 
     @Test
-    @DisplayName("Devrait récupérer le statut de vérification et de changement de mot de passe")
-    void should_return_provider_status_from_keycloak() {
+    @DisplayName("Authenticate : devrait retourner un AuthToken en cas de succès")
+    void shouldAuthenticateSuccessfully() {
         // GIVEN
-        String email = "ivan@test.com";
-        UserRepresentation kUserRep = new UserRepresentation();
-        kUserRep.setEmailVerified(true);
-        kUserRep.setRequiredActions(List.of("UPDATE_PASSWORD"));
-
-        when(usersResource.searchByEmail(email, true)).thenReturn(List.of(kUserRep));
+        Map<String, Object> mockResponse = Map.of(
+                "access_token", "access-123",
+                "refresh_token", "refresh-123",
+                "expires_in", 3600,
+                "token_type", "Bearer");
+        when(restTemplate.postForEntity(anyString(), any(), eq(Map.class)))
+                .thenReturn(ResponseEntity.ok(mockResponse));
 
         // WHEN
-        ProviderStatus status = adapter.getStatus(email);
+        AuthToken token = adapter.authenticate("ivan@test.com", "password");
 
         // THEN
-        assertTrue(status.isEmailVerified(), "L'email devrait être marqué comme vérifié");
-        assertTrue(status.mustChangePassword(), "L'utilisateur devrait avoir une action UPDATE_PASSWORD");
-        verify(usersResource).searchByEmail(email, true);
+        assertNotNull(token);
+        assertEquals("access-123", token.accessToken());
+        assertEquals(3600L, token.expiresIn());
     }
 
     @Test
-    void shouldCallKeycloakLogoutEndpoint() {
-        server.expect(requestTo(containsString("/protocol/openid-connect/logout")))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(content().string(containsString("refresh_token=test-token")))
-                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+    @DisplayName("Logout : devrait appeler l'endpoint de logout")
+    void shouldLogoutSuccessfully() {
+        // GIVEN
+        when(restTemplate.postForEntity(anyString(), any(), eq(Void.class)))
+                .thenReturn(ResponseEntity.ok().build());
 
-        assertDoesNotThrow(() -> adapter.logout("test-token"));
-        server.verify();
+        // WHEN & THEN
+        assertDoesNotThrow(() -> adapter.logout("refresh-token-123"));
+        verify(restTemplate).postForEntity(anyString(), any(), eq(Void.class));
     }
 
+    @Test
+    @DisplayName("UpdateStatus : devrait changer l'état enabled de l'utilisateur")
+    void shouldDisableIdentity() {
+        // GIVEN
+        String email = "test@test.com";
+        UserRepresentation userRep = new UserRepresentation();
+        userRep.setId("uid-123");
+        userRep.setEmail(email);
+
+        when(keycloak.realm(anyString()).users().searchByEmail(email, true))
+                .thenReturn(List.of(userRep));
+
+        // WHEN
+        adapter.disableIdentity(email);
+
+        // THEN
+        verify(keycloak.realm(anyString()).users().get("uid-123")).update(any(UserRepresentation.class));
+        assertFalse(userRep.isEnabled());
+    }
 }

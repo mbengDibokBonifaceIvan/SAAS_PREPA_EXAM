@@ -1,4 +1,4 @@
-package com.ivan.backend.application.port;
+package com.ivan.backend.application.port.in;
 
 import com.ivan.backend.application.dto.LoginRequest;
 import com.ivan.backend.application.dto.LoginResponse;

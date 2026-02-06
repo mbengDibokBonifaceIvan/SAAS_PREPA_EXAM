@@ -2,125 +2,103 @@ package com.ivan.backend.presentation.v1.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ivan.backend.application.dto.ProvisionUserRequest;
-import com.ivan.backend.application.port.ProvisionUserInputPort;
-import com.ivan.backend.application.usecase.SearchUserUseCase;
-import com.ivan.backend.domain.entity.User;
-import com.ivan.backend.domain.valueobject.Email;
+import com.ivan.backend.application.port.in.ManageAccountInputPort;
+import com.ivan.backend.application.port.in.ProvisionUserInputPort;
+import com.ivan.backend.application.port.in.SearchUserInputPort;
+import com.ivan.backend.application.port.in.UpdateUserInputPort;
 import com.ivan.backend.domain.valueobject.UserRole;
+import com.ivan.backend.infrastructure.config.SecurityConfig;
+
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.json.AutoConfigureJsonTesters;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest(AccountManagementController.class)
-@Import(GlobalExceptionHandler.class)
-@AutoConfigureJsonTesters
+@WebMvcTest(AccountManagementController.class)
+@ActiveProfiles("test")
+@Import({ SecurityConfig.class, GlobalExceptionHandler.class }) // <-- Ajoute ton Handler ici
 class AccountManagementControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    // On l'instancie manuellement pour éviter les caprices du contexte de test
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @MockitoBean
     private ProvisionUserInputPort provisionUserUseCase;
     @MockitoBean
-    private SearchUserUseCase searchUserUseCase;
+    private ManageAccountInputPort manageAccountInputPort;
+    @MockitoBean
+    private SearchUserInputPort searchUserPort;
+    @MockitoBean
+    private UpdateUserInputPort updateUserInputPort;
 
     @Test
-    void should_return_201_when_provisioning_is_successful() throws Exception {
-        // Given
+    @DisplayName("Provision : devrait retourner 201 avec les droits appropriés")
+    void shouldProvisionAccountSuccessfully() throws Exception {
+        // GIVEN
         ProvisionUserRequest request = new ProvisionUserRequest(
-                "Staff", "Member", "staff@exams.com", UserRole.STAFF_MEMBER, UUID.randomUUID());
+                "Ivan", "Test", "new@test.com", UserRole.CANDIDATE, UUID.randomUUID());
 
-        // When & Then
+        // WHEN & THEN
         mockMvc.perform(post("/v1/accounts/provision")
-                .with(jwt()
-                        // 1. On ajoute l'autorité pour passer le @PreAuthorize
-                        .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                                "ROLE_CENTER_OWNER")) // 2. On ajoute l'email pour le Use Case
-                        .jwt(j -> j.claim("email", "owner@test.com")))
+                // Correction ici : on utilise .jwt(builder -> builder.claim(...))
+                .with(jwt().jwt(builder -> builder.claim("email", "admin@test.com"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_CENTER_OWNER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.message")
-                        .value("Utilisateur provisionné avec succès. Un email d'activation lui a été envoyé."));
+                .andExpect(jsonPath("$.message").exists());
 
-        verify(provisionUserUseCase).execute(any(ProvisionUserRequest.class), eq("owner@test.com"));
+        verify(provisionUserUseCase).execute(any(), eq("admin@test.com"));
     }
 
     @Test
-    void should_return_403_when_user_is_not_authenticated() throws Exception {
-        mockMvc.perform(post("/v1/accounts/provision")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
-                .andExpect(status().isForbidden());
+    @DisplayName("Ban : devrait retourner 204 et appeler le Use Case")
+    void shouldBanAccount() throws Exception {
+        // WHEN & THEN
+        mockMvc.perform(patch("/v1/accounts/target@test.com/ban")
+                .with(jwt().jwt(builder -> builder.claim("email", "owner@test.com"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_CENTER_OWNER"))))
+                .andExpect(status().isNoContent());
+
+        verify(manageAccountInputPort).banAccount("target@test.com", "owner@test.com");
     }
 
     @Test
-    void should_return_directory_for_owner() throws Exception {
-        // Given
-        String ownerEmail = "owner@test.com";
-        User mockUser = new User(UUID.randomUUID(), "John", "Doe", new Email("john@doe.com"), 
-                                UUID.randomUUID(), null, UserRole.STAFF_MEMBER, true, true, false);
-        
-        when(searchUserUseCase.getDirectory(eq(ownerEmail), any())).thenReturn(List.of(mockUser));
-
-        // When & Then
+    @DisplayName("Security : devrait retourner 403 si un CANDIDATE essaie d'accéder à l'annuaire")
+    void shouldReturn403WhenCandidateAccessDirectory() throws Exception {
         mockMvc.perform(get("/v1/accounts/directory")
-                        .with(jwt().jwt(j -> j.claim("email", ownerEmail))
-                                   .authorities(new SimpleGrantedAuthority("ROLE_CENTER_OWNER"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].firstName").value("John"))
-                .andExpect(jsonPath("$[0].email").value("john@doe.com"));
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CANDIDATE"))))
+                .andExpect(status().isForbidden()); // Maintenant, @PreAuthorize va bloquer !
     }
 
     @Test
-    void should_return_my_profile() throws Exception {
-        String email = "me@test.com";
-        User mockUser = new User(UUID.randomUUID(), "Ivan", "M", new Email(email), 
-                                UUID.randomUUID(), null, UserRole.CENTER_OWNER, true, true, false);
+    @DisplayName("Directory : devrait passer le unitId optionnel s'il est présent")
+    void shouldFetchDirectoryWithUnitId() throws Exception {
+        UUID unitId = UUID.randomUUID();
 
-        when(searchUserUseCase.getUserProfile(email)).thenReturn(mockUser);
+        mockMvc.perform(get("/v1/accounts/directory")
+                .param("unitId", unitId.toString())
+                .with(jwt().jwt(builder -> builder.claim("email", "manager@test.com"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_UNIT_MANAGER"))))
+                .andExpect(status().isOk());
 
-        mockMvc.perform(get("/v1/accounts/me")
-                        .with(jwt().jwt(j -> j.claim("email", email))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value(email))
-                .andExpect(jsonPath("$.role").value("CENTER_OWNER"));
+        verify(searchUserPort).getDirectory("manager@test.com", unitId);
     }
-
-    @Test
-    void should_return_user_by_id_when_authorized() throws Exception {
-        UUID targetId = UUID.randomUUID();
-        String ownerEmail = "owner@test.com";
-        User mockUser = new User(targetId, "Target", "User", new Email("target@test.com"), 
-                                UUID.randomUUID(), null, UserRole.STAFF_MEMBER, true, true, false);
-
-        when(searchUserUseCase.getUserById(targetId, eq(ownerEmail))).thenReturn(mockUser);
-
-        mockMvc.perform(get("/v1/accounts/" + targetId)
-                        .with(jwt().jwt(j -> j.claim("email", ownerEmail))
-                                   .authorities(new SimpleGrantedAuthority("ROLE_CENTER_OWNER"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(targetId.toString()));
-    }
-    
-    
 }

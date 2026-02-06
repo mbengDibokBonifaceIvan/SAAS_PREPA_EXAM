@@ -1,8 +1,8 @@
 package com.ivan.backend.domain.exception;
 
-public class AccountLockedException extends RuntimeException {
+// 403 Forbidden - Sécurité métier (Tentatives échouées)
+public class AccountLockedException extends DomainException {
     public AccountLockedException(String message) {
         super(message);
     }
-    
 }

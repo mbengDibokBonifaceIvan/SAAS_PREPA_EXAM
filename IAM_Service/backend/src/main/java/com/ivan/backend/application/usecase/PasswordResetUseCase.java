@@ -1,12 +1,13 @@
 package com.ivan.backend.application.usecase;
 
 import java.time.LocalDateTime;
-import com.ivan.backend.application.port.PasswordResetInputPort;
+
 import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
-import com.ivan.backend.domain.port.IdentityManagerPort;
-import com.ivan.backend.domain.port.MessagePublisherPort;
+import com.ivan.backend.domain.port.out.IdentityManagerPort;
+import com.ivan.backend.domain.port.out.MessagePublisherPort;
 import com.ivan.backend.domain.repository.UserRepository;
 import com.ivan.backend.domain.valueobject.Email;
+import com.ivan.backend.application.port.in.PasswordResetInputPort;
 import com.ivan.backend.domain.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

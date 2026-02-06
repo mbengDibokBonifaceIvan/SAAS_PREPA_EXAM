@@ -21,8 +21,8 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     @Override
     public User save(User user) {
         // Ta logique de save conservée et isolée
-        UserEntity entity = repository.findById(user.getId())
-                .orElse(new UserEntity());
+        UserModel entity = repository.findById(user.getId())
+                .orElse(new UserModel());
 
         updateEntityFromDomain(entity, user);
 
@@ -68,7 +68,7 @@ public class JpaUserRepositoryAdapter implements UserRepository {
 
     // --- MAPPING PRIVÉ ---
 
-    private User mapToDomain(UserEntity entity) {
+    private User mapToDomain(UserModel entity) {
         return new User(
                 entity.getUserId(),
                 entity.getFirstName(),
@@ -82,16 +82,18 @@ public class JpaUserRepositoryAdapter implements UserRepository {
                 entity.isMustChangePassword());
     }
 
-    private void updateEntityFromDomain(UserEntity entity, User domain) {
-        entity.setUserId(domain.getId());
-        entity.setFirstName(domain.getFirstName());
-        entity.setLastName(domain.getLastName());
-        entity.setEmail(domain.getEmail().value());
-        entity.setRole(domain.getRole());
-        entity.setExternalOrganizationId(domain.getTenantId());
-        entity.setExternalUnitId(domain.getUnitId());
-        entity.setEmailVerified(domain.isEmailVerified());
-        entity.setActive(domain.isActive());
-        entity.setMustChangePassword(domain.isMustChangePassword());
+    private void updateEntityFromDomain(UserModel model, User domain) {
+        model.setUserId(domain.getId());
+        model.setFirstName(domain.getFirstName());
+        model.setLastName(domain.getLastName());
+        model.setEmail(domain.getEmail().value());
+        model.setRole(domain.getRole());
+        model.setExternalOrganizationId(domain.getTenantId());
+        model.setExternalUnitId(domain.getUnitId());
+        model.setEmailVerified(domain.isEmailVerified());
+        model.setActive(domain.isActive());
+        model.setMustChangePassword(domain.isMustChangePassword());
+        // On ne fait SURTOUT PAS de setCreatedAt ou setCreatedBy ici.
+        // JPA s'en occupe tout seul au moment du save().
     }
 }

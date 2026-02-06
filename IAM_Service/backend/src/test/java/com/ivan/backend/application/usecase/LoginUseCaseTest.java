@@ -3,7 +3,7 @@ package com.ivan.backend.application.usecase;
 import com.ivan.backend.application.dto.LoginRequest;
 import com.ivan.backend.application.dto.LoginResponse;
 import com.ivan.backend.domain.entity.User;
-import com.ivan.backend.domain.port.IdentityGatekeeper;
+import com.ivan.backend.domain.port.out.IdentityManagerPort;
 import com.ivan.backend.domain.repository.UserRepository;
 import com.ivan.backend.domain.valueobject.AuthToken;
 import com.ivan.backend.domain.valueobject.Email;
@@ -22,11 +22,14 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.springframework.test.context.ActiveProfiles;
+
+@ActiveProfiles("test")
 
 @ExtendWith(MockitoExtension.class)
 class LoginUseCaseTest {
 
-    @Mock private IdentityGatekeeper identityGatekeeper;
+    @Mock private IdentityManagerPort identityManagerPort;
     @Mock private UserRepository userRepository;
 
     @InjectMocks private LoginUseCase loginUseCase;
@@ -51,9 +54,9 @@ class LoginUseCaseTest {
         // Simule Keycloak : Email vérifié (true) et pas de changement de mot de passe requis (false)
         ProviderStatus providerStatus = new ProviderStatus(true, false);
 
-        when(identityGatekeeper.authenticate(any(), any())).thenReturn(fakeToken);
+        when(identityManagerPort.authenticate(any(), any())).thenReturn(fakeToken);
         when(userRepository.findByEmail(any())).thenReturn(Optional.of(testUser));
-        when(identityGatekeeper.getStatus(any())).thenReturn(providerStatus);
+        when(identityManagerPort.getStatus(any())).thenReturn(providerStatus);
 
         // WHEN
         LoginResponse response = loginUseCase.login(request);

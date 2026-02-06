@@ -1,4 +1,4 @@
-package com.ivan.backend.infrastructure.messaging;
+package com.ivan.backend.infrastructure.adapter.messaging;
 
 import com.ivan.backend.domain.event.AccountActivatedEvent;
 import com.ivan.backend.domain.event.AccountBannedEvent;
@@ -6,7 +6,9 @@ import com.ivan.backend.domain.event.AccountLockedEvent;
 import com.ivan.backend.domain.event.OrganizationRegisteredEvent;
 import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
 import com.ivan.backend.domain.event.UserProvisionedEvent;
-import com.ivan.backend.domain.port.MessagePublisherPort;
+import com.ivan.backend.domain.port.out.MessagePublisherPort;
+import com.ivan.backend.infrastructure.config.RabbitMQConfig;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -21,12 +23,17 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
 
     @Override
     public void publishOrganizationRegistered(OrganizationRegisteredEvent event) {
-        log.info("Publication de l'événement d'inscription pour l'organisation: {}", event.organizationName());
-
-        rabbitTemplate.convertAndSend(
-                RabbitMQConfig.EXCHANGE_NAME,
-                RabbitMQConfig.ROUTING_KEY_ORG_REGISTERED,
-                event);
+        try {
+            log.info("Publication de l'événement pour l'organisation: {}", event.organizationName());
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.EXCHANGE_NAME,
+                    RabbitMQConfig.ROUTING_KEY_ORG_REGISTERED,
+                    event);
+        } catch (Exception e) {
+            // On ne relance pas l'exception pour ne pas rollback la création du compte
+            log.error("CRITICAL: Impossible de publier l'événement pour {}. L'administrateur doit vérifier manuellement.",
+                    event.organizationName(), e);
+        }
     }
 
     @Override
@@ -58,24 +65,22 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
         log.info("Événement UserProvisioned publié pour : {}", event.email());
     }
 
-      @Override
+    @Override
     public void publishAccountActivated(AccountActivatedEvent event) {
         log.info("Publication de l'événement d'activation pour: {}", event.userEmail());
-        
+
         rabbitTemplate.convertAndSend(
-            RabbitMQConfig.EXCHANGE_NAME,
-            RabbitMQConfig.ROUTING_KEY_ACCOUNT_ACTIVATED,
-            event
-        );
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_ACCOUNT_ACTIVATED,
+                event);
     }
 
     @Override
     public void publishAccountBanned(AccountBannedEvent event) {
         log.info("Publication de l'événement de bannissement pour: {}", event.userEmail());
         rabbitTemplate.convertAndSend(
-            RabbitMQConfig.EXCHANGE_NAME,
-            RabbitMQConfig.ROUTING_KEY_ACCOUNT_BANNED,
-            event
-        );
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_ACCOUNT_BANNED,
+                event);
     }
 }

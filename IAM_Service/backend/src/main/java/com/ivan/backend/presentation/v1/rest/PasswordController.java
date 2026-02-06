@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import com.ivan.backend.application.dto.ForgotPasswordRequest;
-import com.ivan.backend.application.port.PasswordResetInputPort;
+import com.ivan.backend.application.port.in.PasswordResetInputPort;
 
 import lombok.RequiredArgsConstructor;
 
@@ -18,11 +18,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PasswordController {
 
-    private final PasswordResetInputPort passwordResetUseCase;
+    private final PasswordResetInputPort passwordResetInputPort;
 
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
-        passwordResetUseCase.requestReset(request.email());
+        passwordResetInputPort.requestReset(request.email());
         
         return ResponseEntity.ok(Map.of(
             "message", "Si un compte est associé à cet email, une procédure de réinitialisation a été envoyée."

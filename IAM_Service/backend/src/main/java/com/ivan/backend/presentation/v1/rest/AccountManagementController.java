@@ -3,10 +3,10 @@ package com.ivan.backend.presentation.v1.rest;
 import com.ivan.backend.application.dto.ProvisionUserRequest;
 import com.ivan.backend.application.dto.UpdateUserRequest;
 import com.ivan.backend.application.dto.UserResponse;
-import com.ivan.backend.application.port.ManageAccountInputPort;
-import com.ivan.backend.application.port.ProvisionUserInputPort;
-import com.ivan.backend.application.usecase.SearchUserUseCase;
-import com.ivan.backend.application.usecase.UpdateUserUseCase;
+import com.ivan.backend.application.port.in.ManageAccountInputPort;
+import com.ivan.backend.application.port.in.ProvisionUserInputPort;
+import com.ivan.backend.application.port.in.SearchUserInputPort;
+import com.ivan.backend.application.port.in.UpdateUserInputPort;
 import com.ivan.backend.domain.entity.User;
 
 import lombok.RequiredArgsConstructor;
@@ -27,9 +27,9 @@ import java.util.UUID;
 public class AccountManagementController {
 
     private final ProvisionUserInputPort provisionUserUseCase;
-    private final ManageAccountInputPort manageAccountUseCase;
-    private final SearchUserUseCase searchUserUseCase;
-    private final UpdateUserUseCase updateUserUseCase;
+    private final ManageAccountInputPort manageAccountInputPort;
+    private final SearchUserInputPort searchUserPort;
+    private final UpdateUserInputPort updateUserInputPort;
 
     private static final String EMAIL = "email";
 
@@ -59,7 +59,7 @@ public class AccountManagementController {
             @AuthenticationPrincipal Jwt jwt // <--- Utilise JWT ici
     ) {
         String ownerEmail = jwt.getClaimAsString(EMAIL); // On récupère le vrai email
-        manageAccountUseCase.banAccount(email, ownerEmail);
+        manageAccountInputPort.banAccount(email, ownerEmail);
         return ResponseEntity.noContent().build();
     }
 
@@ -70,7 +70,7 @@ public class AccountManagementController {
             @AuthenticationPrincipal Jwt jwt // <--- Et ici aussi
     ) {
         String ownerEmail = jwt.getClaimAsString(EMAIL);
-        manageAccountUseCase.activateAccount(email, ownerEmail);
+        manageAccountInputPort.activateAccount(email, ownerEmail);
         return ResponseEntity.noContent().build();
     }
 
@@ -80,7 +80,7 @@ public class AccountManagementController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getMyProfile(@AuthenticationPrincipal Jwt jwt) {
         String email = jwt.getClaimAsString(EMAIL);
-        User user = searchUserUseCase.getUserProfile(email);
+        User user = searchUserPort.getUserProfile(email);
         return ResponseEntity.ok(UserResponse.fromDomain(user));
     }
 
@@ -94,7 +94,7 @@ public class AccountManagementController {
             @RequestParam(required = false) UUID unitId // Paramètre optionnel : ?unitId=...
     ) {
         String email = jwt.getClaimAsString(EMAIL);
-        List<User> users = searchUserUseCase.getDirectory(email, unitId);
+        List<User> users = searchUserPort.getDirectory(email, unitId);
 
         return ResponseEntity.ok(users.stream()
                 .map(UserResponse::fromDomain)
@@ -105,18 +105,17 @@ public class AccountManagementController {
     @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER')")
     public ResponseEntity<UserResponse> getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         // Il faudra ajouter cette méthode dans ton UseCase
-        User user = searchUserUseCase.getUserById(id, jwt.getClaimAsString(EMAIL));
+        User user = searchUserPort.getUserById(id, jwt.getClaimAsString(EMAIL));
         return ResponseEntity.ok(UserResponse.fromDomain(user));
     }
 
     @PutMapping("/{id}")
-@PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER', 'STAFF_MEMBER')")
-public ResponseEntity<Void> updateUser(
-        @PathVariable UUID id,
-        @RequestBody UpdateUserRequest request,
-        @AuthenticationPrincipal Jwt jwt
-) {
-    updateUserUseCase.execute(id, jwt.getClaimAsString(EMAIL), request);
-    return ResponseEntity.noContent().build();
-}
+    @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER', 'STAFF_MEMBER')")
+    public ResponseEntity<Void> updateUser(
+            @PathVariable UUID id,
+            @RequestBody UpdateUserRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        updateUserInputPort.execute(id, jwt.getClaimAsString(EMAIL), request);
+        return ResponseEntity.noContent().build();
+    }
 }

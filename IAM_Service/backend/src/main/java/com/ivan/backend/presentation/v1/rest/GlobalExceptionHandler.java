@@ -1,12 +1,20 @@
 package com.ivan.backend.presentation.v1.rest;
 
 import com.ivan.backend.domain.exception.AccountLockedException;
+import com.ivan.backend.domain.exception.BusinessRuleViolationException;
 import com.ivan.backend.domain.exception.DomainException;
-import com.ivan.backend.domain.exception.KeycloakIdentityException;
+import com.ivan.backend.domain.exception.InsufficientPrivilegesException;
+import com.ivan.backend.domain.exception.ResourceAccessDeniedException;
 import com.ivan.backend.domain.exception.UserAlreadyExistsException;
+import com.ivan.backend.infrastructure.adapter.identity.exception.KeycloakIdentityException;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -19,80 +27,123 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final String ERROR_KEY = "error";
     private static final String TIMESTAMP = "timestamp";
 
-    // --- EXCEPTIONS DOMAINE (Format Simple Map) ---
+    /**
+     * Helper pour centraliser la création des ProblemDetail
+     */
+    private ProblemDetail buildProblem(HttpStatus status, String title, String detail, String path) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setTitle(title);
+        if (path != null) {
+            problem.setType(URI.create("https://api.exams.com/errors/" + path));
+        }
+        problem.setProperty(TIMESTAMP, Instant.now());
+        return problem;
+    }
+
+    // --- DOMAIN & BUSINESS EXCEPTIONS ---
 
     @ExceptionHandler(UserAlreadyExistsException.class)
-    public ResponseEntity<Map<String, String>> handleUserExists(UserAlreadyExistsException ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(Map.of(ERROR_KEY, ex.getMessage()));
+    public ProblemDetail handleUserExists(UserAlreadyExistsException ex) {
+        return buildProblem(HttpStatus.CONFLICT, "Conflit d'identité", ex.getMessage(), "user-already-exists");
     }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleValidation(IllegalArgumentException ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(Map.of(ERROR_KEY, "Format invalide : " + ex.getMessage()));
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        String details = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .collect(Collectors.joining(", "));
-
-        return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Validation echouée: " + details));
-    }
-
-    // --- EXCEPTIONS SÉCURITÉ (Format RFC 7807 ProblemDetail) ---
 
     @ExceptionHandler(AccountLockedException.class)
     public ProblemDetail handleAccountLocked(AccountLockedException ex) {
-        // Code 403 Forbidden car l'accès est refusé à cause du statut du compte
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
-        problemDetail.setTitle("Compte Verrouillé");
-        problemDetail.setType(URI.create("https://api.exams.com/errors/account-locked"));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
-        return problemDetail;
+        return buildProblem(HttpStatus.FORBIDDEN, "Compte Verrouillé", ex.getMessage(), "account-locked");
+    }
+
+    @ExceptionHandler(InsufficientPrivilegesException.class)
+    public ProblemDetail handlePrivileges(InsufficientPrivilegesException ex) {
+        return buildProblem(HttpStatus.FORBIDDEN, "Droits insuffisants", ex.getMessage(), "insufficient-privileges");
+    }
+
+    @ExceptionHandler(ResourceAccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(ResourceAccessDeniedException ex) {
+        // 403 est parfait pour l'isolation multi-tenant ou unité
+        return buildProblem(HttpStatus.FORBIDDEN, "Accès refusé", ex.getMessage(), "resource-access-denied");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAccessDeniedException(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Accès refusé : privilèges insuffisants"));
+    }
+
+    @ExceptionHandler(BusinessRuleViolationException.class)
+    public ProblemDetail handleBusinessRule(BusinessRuleViolationException ex) {
+        // 400 est préférable pour une erreur de donnée (ex: nom vide)
+        return buildProblem(HttpStatus.BAD_REQUEST, "Règle métier violée", ex.getMessage(), "business-rule-violation");
+    }
+
+    // Handler générique pour les autres DomainException non listées
+    @ExceptionHandler(DomainException.class)
+    public ProblemDetail handleDomainException(DomainException ex) {
+        return buildProblem(HttpStatus.BAD_REQUEST, "Erreur métier", ex.getMessage(), "domain-error");
+    }
+
+    // --- VALIDATION & SYNTAX EXCEPTIONS ---
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleValidation(IllegalArgumentException ex) {
+        return buildProblem(HttpStatus.BAD_REQUEST, "Format invalide", ex.getMessage(), "invalid-format");
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = ex.getBindingResult().getFieldErrors().stream()
+                .collect(Collectors.toMap(
+                        FieldError::getField,
+                        DefaultMessageSourceResolvable::getDefaultMessage,
+                        (existing, replacement) -> existing));
+
+        ProblemDetail problem = buildProblem(HttpStatus.BAD_REQUEST, "Validation échouée",
+                "Champs invalides", "validation-error");
+        problem.setProperty("invalid_params", errors);
+        return problem;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleJsonError(HttpMessageNotReadableException ex) {
+        return buildProblem(HttpStatus.BAD_REQUEST, "Erreur de lecture JSON",
+                "Le format du JSON est invalide (syntaxe incorrecte).", "malformed-json");
+    }
+
+    // --- INFRASTRUCTURE EXCEPTIONS ---
+
+    @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
+    public ProblemDetail handleNotFound(jakarta.persistence.EntityNotFoundException ex) {
+        return buildProblem(HttpStatus.NOT_FOUND, "Ressource non trouvée", ex.getMessage(), "not-found");
     }
 
     @ExceptionHandler(KeycloakIdentityException.class)
     public ProblemDetail handleKeycloakException(KeycloakIdentityException ex) {
-        // On utilise le VRAI message de l'exception au lieu d'un texte fixe
-        HttpStatus status = ex.getMessage().contains("identifiants") ? HttpStatus.UNAUTHORIZED
+        HttpStatus status = ex.getMessage().toLowerCase().contains("identifiants") ? HttpStatus.UNAUTHORIZED
                 : HttpStatus.INTERNAL_SERVER_ERROR;
 
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, ex.getMessage());
-        problemDetail.setTitle("Erreur Service Identité");
-        problemDetail.setType(URI.create("https://api.exams.com/errors/identity-service-error"));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        ProblemDetail problem = buildProblem(status, "Erreur Service Identité", ex.getMessage(),
+                "identity-service-error");
 
-        // Si on a une cause racine (ex: problème réseau Docker), on l'ajoute pour le
-        // debug
         if (ex.getCause() != null) {
-            problemDetail.setProperty("debug_info", ex.getCause().getMessage());
+            problem.setProperty("debug_info", ex.getCause().getMessage());
         }
+        return problem;
+    }
+    
 
-        return problemDetail;
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
+        // Souvent levé lors d'un doublon d'email si le check préventif a raté
+        return buildProblem(HttpStatus.CONFLICT, "Erreur de persistance",
+                "Une contrainte d'unicité a été violée (email ou ID déjà existant).", "database-conflict");
     }
 
-    @ExceptionHandler(DomainException.class)
-    public ProblemDetail handleDomainException(DomainException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
-        problemDetail.setTitle("Violation des règles métier");
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
-        return problemDetail;
-    }
+    // --- CATCH-ALL FOR UNEXPECTED ERRORS ---
 
-    @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
-    public ProblemDetail handleNotFound(jakarta.persistence.EntityNotFoundException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        problemDetail.setTitle("Ressource non trouvée");
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
-        return problemDetail;
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleGeneralException(Exception ex) {
+        return buildProblem(HttpStatus.INTERNAL_SERVER_ERROR, "Erreur Interne",
+                "Une erreur inattendue est survenue.", "internal-server-error");
     }
-
 }

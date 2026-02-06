@@ -5,80 +5,80 @@ import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.ivan.backend.application.port.ManageAccountInputPort;
+import com.ivan.backend.application.port.in.ManageAccountInputPort;
 import com.ivan.backend.domain.entity.User;
 import com.ivan.backend.domain.event.AccountActivatedEvent;
 import com.ivan.backend.domain.event.AccountBannedEvent;
-import com.ivan.backend.domain.exception.DomainException;
-import com.ivan.backend.domain.port.IdentityManagerPort;
-import com.ivan.backend.domain.port.MessagePublisherPort;
+import com.ivan.backend.domain.port.out.IdentityManagerPort;
+import com.ivan.backend.domain.port.out.MessagePublisherPort;
 import com.ivan.backend.domain.repository.UserRepository;
 import com.ivan.backend.domain.valueobject.Email;
-import com.ivan.backend.domain.valueobject.UserRole;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ManageAccountUseCase implements ManageAccountInputPort {
 
     private final UserRepository userRepository;
     private final MessagePublisherPort messagePublisher;
-    private final IdentityManagerPort identityManagerPort; // Port vers Keycloak
+    private final IdentityManagerPort identityManagerPort;
 
     @Override
     @Transactional
-    public void banAccount(String userEmail, String ownerEmail) {
-        User user = verifyAndGetRelativeUser(userEmail, ownerEmail);
+    public void banAccount(String userEmail, String requesterEmail) {
+        User target = findUserByEmail(userEmail);
+        User requester = findUserByEmail(requesterEmail);
 
-        // 1. Action Locale
-        user.deactivate();
-        userRepository.save(user);
+        // 1. Validation métier centralisée dans l'entité User
+        // Lance ResourceAccessDeniedException ou InsufficientPrivilegesException
+        requester.checkCanManage(target);
 
-        // 2. Action Keycloak (Synchronisation)
+        // 2. Action Locale
+        target.deactivate();
+        userRepository.save(target);
+
+        // 3. Action Keycloak
         identityManagerPort.disableIdentity(userEmail);
 
-        // 3. Notification
+        // 4. Notification
         messagePublisher.publishAccountBanned(new AccountBannedEvent(
-                userEmail, "Banni manuellement par le chef de centre", ownerEmail, LocalDateTime.now()));
+                userEmail, "Désactivé par un administrateur", requesterEmail, LocalDateTime.now()));
+        
+        log.info("Compte banni : {} par {}", userEmail, requesterEmail);
     }
 
     @Override
     @Transactional
-    public void activateAccount(String userEmail, String ownerEmail) {
-        User user = verifyAndGetRelativeUser(userEmail, ownerEmail);
+    public void activateAccount(String userEmail, String requesterEmail) {
+        User target = findUserByEmail(userEmail);
+        User requester = findUserByEmail(requesterEmail);
 
-        // 1. Action Locale
-        user.activate();
-        userRepository.save(user);
+        // 1. Validation métier centralisée
+        requester.checkCanManage(target);
 
-        // 2. Action Keycloak
+        // 2. Action Locale
+        target.activate();
+        userRepository.save(target);
+
+        // 3. Action Keycloak
         identityManagerPort.enableIdentity(userEmail);
 
-        // 3. Notification
+        // 4. Notification
         messagePublisher.publishAccountActivated(new AccountActivatedEvent(
-                userEmail, "Compte activé manuellement par le chef de centre", ownerEmail, LocalDateTime.now()));
+                userEmail, "Activé par un administrateur", requesterEmail, LocalDateTime.now()));
+        
+        log.info("Compte activé : {} par {}", userEmail, requesterEmail);
     }
 
-    private User verifyAndGetRelativeUser(String userEmail, String ownerEmail) {
-        User owner = userRepository.findByEmail(new Email(ownerEmail))
-                .orElseThrow(() -> new EntityNotFoundException("Propriétaire inconnu"));
-
-        User user = userRepository.findByEmail(new Email(userEmail))
-                .orElseThrow(() -> new EntityNotFoundException("Utilisateur à gérer non trouvé"));
-
-        // 1. Isolation de l'organisation (Tenant)
-        if (!user.getTenantId().equals(owner.getTenantId())) {
-            throw new DomainException("Violation de périmètre : l'utilisateur appartient à un autre centre");
-        }
-
-        // 2. Isolation de l'unité (Pour les Managers uniquement)
-        if (owner.getRole() == UserRole.UNIT_MANAGER &&
-                (user.getUnitId() == null || !user.getUnitId().equals(owner.getUnitId()))) {
-            throw new DomainException("Accès refusé : vous ne pouvez gérer que les membres de votre sous-centre");
-        }
-
-        return user;
+    /**
+     * Helper pour éviter la répétition et utiliser l'objet Email
+     */
+    private User findUserByEmail(String email) {
+        return userRepository.findByEmail(new Email(email))
+                .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé : " + email));
     }
 }

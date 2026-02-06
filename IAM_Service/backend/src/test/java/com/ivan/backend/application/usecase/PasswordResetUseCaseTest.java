@@ -1,59 +1,80 @@
 package com.ivan.backend.application.usecase;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-
-import java.util.Optional;
-
+import com.ivan.backend.domain.entity.User;
+import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
+import com.ivan.backend.domain.port.out.IdentityManagerPort;
+import com.ivan.backend.domain.port.out.MessagePublisherPort;
+import com.ivan.backend.domain.repository.UserRepository;
+import com.ivan.backend.domain.valueobject.Email;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.ivan.backend.domain.entity.User;
-import com.ivan.backend.domain.port.IdentityManagerPort;
-import com.ivan.backend.domain.port.MessagePublisherPort;
-import com.ivan.backend.domain.repository.UserRepository;
-import com.ivan.backend.domain.valueobject.Email;
+import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import org.springframework.test.context.ActiveProfiles;
+
+@ActiveProfiles("test")
 @ExtendWith(MockitoExtension.class)
 class PasswordResetUseCaseTest {
+
     @Mock private UserRepository userRepository;
     @Mock private IdentityManagerPort identityManagerPort;
     @Mock private MessagePublisherPort messagePublisher;
-    @InjectMocks private PasswordResetUseCase useCase;
 
-  @Test
-    void should_call_identity_manager_only_if_user_active() {
+    @InjectMocks
+    private PasswordResetUseCase passwordResetUseCase;
+
+    @Test
+    @DisplayName("Reset : devrait envoyer le mail si l'utilisateur existe et est actif")
+    void shouldRequestReset_WhenUserExistsAndIsActive() {
         // GIVEN
-        String emailStr = "test@ivan.com";
-        Email emailVo = new Email(emailStr);
-        
-        // Utilise ton constructeur habituel ici
-        User activeUser = new User(null, emailStr, emailStr, emailVo, null, null, null, false, true, false); 
-
-        when(userRepository.findByEmail(any())).thenReturn(Optional.of(activeUser));
+        String email = "active@test.com";
+        User user = mock(User.class);
+        when(user.isActive()).thenReturn(true);
+        when(userRepository.findByEmail(new Email(email))).thenReturn(Optional.of(user));
 
         // WHEN
-        useCase.requestReset(emailStr);
+        passwordResetUseCase.requestReset(email);
 
         // THEN
-        verify(identityManagerPort).sendPasswordReset(emailStr);
-        verify(messagePublisher).publishPasswordResetRequested(any());
+        verify(identityManagerPort, times(1)).sendPasswordReset(email);
+        verify(messagePublisher, times(1)).publishPasswordResetRequested(any(PasswordResetRequestedEvent.class));
     }
 
     @Test
-    void should_not_trigger_anything_if_user_not_found() {
+    @DisplayName("Reset : ne devrait rien faire si l'utilisateur est banni (inactif)")
+    void shouldDoNothing_WhenUserIsBanned() {
         // GIVEN
-        when(userRepository.findByEmail(any())).thenReturn(Optional.empty());
+        String email = "banned@test.com";
+        User user = mock(User.class);
+        when(user.isActive()).thenReturn(false); // Utilisateur banni
+        when(userRepository.findByEmail(new Email(email))).thenReturn(Optional.of(user));
 
         // WHEN
-        useCase.requestReset("ghost@test.com");
+        passwordResetUseCase.requestReset(email);
 
         // THEN
-        verifyNoInteractions(identityManagerPort);
+        verifyNoInteractions(identityManagerPort, messagePublisher);
+    }
+
+    @Test
+    @DisplayName("Reset : ne devrait rien faire si l'utilisateur n'existe pas (Sécurité)")
+    void shouldDoNothing_WhenUserDoesNotExist() {
+        // GIVEN
+        String email = "unknown@test.com";
+        when(userRepository.findByEmail(new Email(email))).thenReturn(Optional.empty());
+
+        // WHEN
+        passwordResetUseCase.requestReset(email);
+
+        // THEN
+        // On vérifie qu'aucune exception n'est jetée et qu'aucun service n'est appelé
+        verifyNoInteractions(identityManagerPort, messagePublisher);
     }
 }
