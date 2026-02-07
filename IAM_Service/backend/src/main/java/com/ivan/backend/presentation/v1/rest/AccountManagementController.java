@@ -7,7 +7,6 @@ import com.ivan.backend.application.port.in.ManageAccountInputPort;
 import com.ivan.backend.application.port.in.ProvisionUserInputPort;
 import com.ivan.backend.application.port.in.SearchUserInputPort;
 import com.ivan.backend.application.port.in.UpdateUserInputPort;
-import com.ivan.backend.domain.entity.User;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -80,8 +79,8 @@ public class AccountManagementController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getMyProfile(@AuthenticationPrincipal Jwt jwt) {
         String email = jwt.getClaimAsString(EMAIL);
-        User user = searchUserPort.getUserProfile(email);
-        return ResponseEntity.ok(UserResponse.fromDomain(user));
+        UserResponse user = UserResponse.fromDomain(searchUserPort.getUserProfile(email));
+        return ResponseEntity.ok(user);
     }
 
     /**
@@ -94,19 +93,19 @@ public class AccountManagementController {
             @RequestParam(required = false) UUID unitId // Paramètre optionnel : ?unitId=...
     ) {
         String email = jwt.getClaimAsString(EMAIL);
-        List<User> users = searchUserPort.getDirectory(email, unitId);
-
-        return ResponseEntity.ok(users.stream()
+        List<UserResponse> users = searchUserPort.getDirectory(email, unitId).stream()
                 .map(UserResponse::fromDomain)
-                .toList());
+                .toList();
+
+        return ResponseEntity.ok(users);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER')")
     public ResponseEntity<UserResponse> getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         // Il faudra ajouter cette méthode dans ton UseCase
-        User user = searchUserPort.getUserById(id, jwt.getClaimAsString(EMAIL));
-        return ResponseEntity.ok(UserResponse.fromDomain(user));
+        UserResponse user = UserResponse.fromDomain(searchUserPort.getUserById(id, jwt.getClaimAsString(EMAIL)));
+        return ResponseEntity.ok(user);
     }
 
     @PutMapping("/{id}")
