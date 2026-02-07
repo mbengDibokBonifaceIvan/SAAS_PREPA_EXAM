@@ -27,7 +27,7 @@ services:
     image: rabbitmq:3.12-management-alpine
     container_name: iam-rabbitmq
     ports:
-      - "5672:5672"   # Port AMQP
+      - "5672:5672" # Port AMQP
       - "15672:15672" # Management UI (guest/guest)
     networks:
       - iam-network
@@ -53,11 +53,23 @@ services:
       # On force Keycloak à toujours se considérer comme localhost:8080
       KC_HOSTNAME: localhost
       # Cette commande force l'import au démarrage
-     # KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+      # KC_IMPORT: /opt/keycloak/data/import/realm-export.json
     #volumes:
-     # - ./realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    # - ./realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
       - "8080:8080"
+    healthcheck:
+      # On utilise /dev/tcp pour vérifier si le port répond (pas besoin de curl)
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && cat <&3 | grep -q \"200 OK\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
     depends_on:
       - iam-db
     networks:
@@ -76,22 +88,22 @@ services:
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
-      - KEYCLOAK_CLIENT_SECRET=k2jrL3KQ0lNNY3VF8sZxLQ3azw0FUi36 
+      - KEYCLOAK_CLIENT_SECRET=k2jrL3KQ0lNNY3VF8sZxLQ3azw0FUi36
       - KEYCLOAK_SERVER_URL=http://iam-keycloak:8080
 
       # SOLUTION ISSUER : On dit au backend d'accepter "localhost" car c'est ce que le navigateur envoie
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080/realms/ExamsRealm
-      
+
       # SOLUTION RÉSEAU : Le backend va quand même chercher les clés de validation via le réseau interne Docker
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://iam-keycloak:8080/realms/ExamsRealm/protocol/openid-connect/certs
 
     depends_on:
-       iam-db:
-         condition: service_healthy
-       keycloak:
-         condition: service_started
-       rabbitmq:
-         condition: service_started  
+      iam-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - iam-network
 
