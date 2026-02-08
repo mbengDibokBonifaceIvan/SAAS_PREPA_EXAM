@@ -10,15 +10,15 @@ services:
       POSTGRES_MULTIPLE_DATABASES: keycloak_db,iam_logic_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+      - ./backend/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
     ports:
       - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user_admin -d iam_logic_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 20s
     networks:
       - iam-network
 
@@ -36,8 +36,8 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
     container_name: iam-keycloak
-    # On ajoute --hostname pour forcer l'identité du serveur
-    command: start-dev --http-enabled=true --hostname=localhost
+  # On ajoute explicitement --import-realm à la commande
+    command: start-dev --http-enabled=true --hostname=localhost --import-realm
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://iam-db:5432/keycloak_db
@@ -53,9 +53,9 @@ services:
       # On force Keycloak à toujours se considérer comme localhost:8080
       KC_HOSTNAME: localhost
       # Cette commande force l'import au démarrage
-      # KC_IMPORT: /opt/keycloak/data/import/realm-export.json
-    #volumes:
-    # - ./realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+    volumes:
+     - ./backend/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
       - "8080:8080"
     healthcheck:
@@ -66,9 +66,9 @@ services:
           "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && cat <&3 | grep -q \"200 OK\"",
         ]
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      timeout: 60s
+      retries: 15
+      start_period: 90s
 
     depends_on:
       - iam-db
@@ -77,7 +77,7 @@ services:
 
   # Ton Service IAM (Spring Boot)
   iam-service:
-    build: .
+    build: ./backend
     container_name: iam-service-app
     ports:
       - "8081:8081"
@@ -106,6 +106,7 @@ services:
         condition: service_started
     networks:
       - iam-network
+
 
 networks:
   iam-network:

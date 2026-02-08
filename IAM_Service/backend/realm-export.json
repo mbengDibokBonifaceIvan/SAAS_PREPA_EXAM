@@ -509,6 +509,7 @@
       ],
       "clientRoles": {
         "realm-management": [
+          "realm-admin",
           "view-users",
           "manage-users",
           "query-users"
@@ -740,7 +741,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "k2jrL3KQ0lNNY3VF8sZxLQ3azw0FUi36",
       "redirectUris": [
         "*"
       ],
