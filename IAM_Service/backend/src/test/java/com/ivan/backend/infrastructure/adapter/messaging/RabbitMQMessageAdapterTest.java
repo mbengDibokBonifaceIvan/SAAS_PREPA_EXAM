@@ -1,5 +1,8 @@
 package com.ivan.backend.infrastructure.adapter.messaging;
 
+import com.ivan.backend.domain.event.AccountActivatedEvent;
+import com.ivan.backend.domain.event.AccountBannedEvent;
+import com.ivan.backend.domain.event.AccountLockedEvent;
 import com.ivan.backend.domain.event.OrganizationRegisteredEvent;
 import com.ivan.backend.domain.event.PasswordResetRequestedEvent;
 import com.ivan.backend.domain.event.UserProvisionedEvent;
@@ -32,30 +35,27 @@ class RabbitMQMessageAdapterTest {
     @InjectMocks
     private RabbitMQMessageAdapter messageAdapter;
 
-
     @Test
     void should_send_json_organization_registered_event() {
         // Given: On prépare un événement conforme au record du Domain
         UUID orgId = UUID.randomUUID();
         var event = new OrganizationRegisteredEvent(
-            orgId, 
-            "Centre Test", 
-            "ivan@test.com", 
-            "Ivan", 
-            "D",
-            true
-        );
+                orgId,
+                "Centre Test",
+                "ivan@test.com",
+                "Ivan",
+                "D",
+                true);
 
         // When: On appelle l'adaptateur d'infrastructure
         messageAdapter.publishOrganizationRegistered(event);
 
-        // Then: On vérifie que le RabbitTemplate a reçu l'ordre d'envoi 
+        // Then: On vérifie que le RabbitTemplate a reçu l'ordre d'envoi
         // vers le bon Exchange et avec la bonne Routing Key
         verify(rabbitTemplate).convertAndSend(
-            RabbitMQConfig.EXCHANGE_NAME,
-            RabbitMQConfig.ROUTING_KEY_ORG_REGISTERED,
-            event
-        );
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_ORG_REGISTERED,
+                event);
     }
 
     @Test
@@ -68,20 +68,17 @@ class RabbitMQMessageAdapterTest {
 
         // THEN
         verify(rabbitTemplate).convertAndSend(
-            RabbitMQConfig.EXCHANGE_NAME,
-            RabbitMQConfig.ROUTING_KEY_PASSWORD_RESET_REQUESTED,
-            event
-        );
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_PASSWORD_RESET_REQUESTED,
+                event);
     }
-    
 
     @Test
     @DisplayName("Devrait envoyer l'événement d'organisation avec les bons paramètres")
     void shouldPublishOrganizationRegistered() {
         // GIVEN
         OrganizationRegisteredEvent event = new OrganizationRegisteredEvent(
-                UUID.randomUUID(), "DevCorp", "owner@test.com", "Ivan","MBENG", true
-        );
+                UUID.randomUUID(), "DevCorp", "owner@test.com", "Ivan", "MBENG", true);
 
         // WHEN
         messageAdapter.publishOrganizationRegistered(event);
@@ -90,8 +87,7 @@ class RabbitMQMessageAdapterTest {
         verify(rabbitTemplate, times(1)).convertAndSend(
                 eq(RabbitMQConfig.EXCHANGE_NAME),
                 eq(RabbitMQConfig.ROUTING_KEY_ORG_REGISTERED),
-                eq(event)
-        );
+                eq(event));
     }
 
     @Test
@@ -112,8 +108,7 @@ class RabbitMQMessageAdapterTest {
     void shouldPublishUserProvisioned() {
         // GIVEN
         UserProvisionedEvent event = new UserProvisionedEvent(
-                UUID.randomUUID(), "new@test.com", null, UUID.randomUUID(), LocalDateTime.now()
-        );
+                UUID.randomUUID(), "new@test.com", null, UUID.randomUUID(), LocalDateTime.now());
 
         // WHEN
         messageAdapter.publishUserProvisioned(event);
@@ -122,7 +117,57 @@ class RabbitMQMessageAdapterTest {
         verify(rabbitTemplate).convertAndSend(
                 eq(RabbitMQConfig.EXCHANGE_NAME),
                 eq(RabbitMQConfig.ROUTING_KEY_USER_PROVISIONED),
-                eq(event)
-        );
+                eq(event));
+    }
+
+    @Test
+    @DisplayName("Devrait envoyer l'événement de bannissement de compte")
+    void shouldPublishAccountBanned() {
+        // GIVEN
+        var event = new AccountBannedEvent("banned@test.com", "Raison du bannissement", "owner@test.com",
+                LocalDateTime.now());
+
+        // WHEN
+        messageAdapter.publishAccountBanned(event);
+
+        // THEN
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.EXCHANGE_NAME),
+                eq(RabbitMQConfig.ROUTING_KEY_ACCOUNT_BANNED),
+                eq(event));
+    }
+
+    @Test
+    @DisplayName("Devrait envoyer l'événement d'activation de compte")
+    void shouldPublishAccountActivated() {
+        // GIVEN
+        var event = new AccountActivatedEvent("active@test.com", "Raison de l'activation", "owner@test.com",
+                LocalDateTime.now());
+
+        // WHEN
+        messageAdapter.publishAccountActivated(event);
+
+        // THEN
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.EXCHANGE_NAME),
+                eq(RabbitMQConfig.ROUTING_KEY_ACCOUNT_ACTIVATED),
+                eq(event));
+    }
+
+    @Test
+    @DisplayName("Devrait envoyer l'événement de verrouillage de compte")
+    void shouldPublishAccountLocked() {
+        // GIVEN
+        var event = new AccountLockedEvent("locked@test.com", "Raison du verrouillage", LocalDateTime.now(),
+                "ownerEmail@test.com");
+
+        // WHEN
+        messageAdapter.publishAccountLocked(event);
+
+        // THEN
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMQConfig.EXCHANGE_NAME),
+                eq(RabbitMQConfig.ROUTING_KEY_USER_LOCKED),
+                eq(event));
     }
 }

@@ -91,6 +91,89 @@ class UserTest {
         }
     }
 
+    @Nested
+    @DisplayName("Création d'utilisateurs (validateCanCreate)")
+    class CreationTests {
+
+        @Test
+        @DisplayName("Devrait rejeter si l'on crée pour un autre tenant")
+        void shouldRejectDifferentTenantOnCreation() {
+            User owner = createUser(tenant1, unit1, UserRole.CENTER_OWNER);
+            assertThrows(ResourceAccessDeniedException.class,
+                    () -> owner.validateCanCreate(UserRole.STAFF_MEMBER, tenant2, unit1));
+        }
+
+        @Test
+        @DisplayName("Devrait rejeter si le rôle cible est supérieur ou égal")
+        void shouldRejectHigherOrEqualRoleCreation() {
+            User manager = createUser(tenant1, unit1, UserRole.UNIT_MANAGER);
+            // Un manager ne peut pas créer un autre manager ou un owner
+            assertThrows(InsufficientPrivilegesException.class,
+                    () -> manager.validateCanCreate(UserRole.UNIT_MANAGER, tenant1, unit1));
+        }
+
+        @Test
+        @DisplayName("Devrait rejeter si un manager crée hors de son unité")
+        void shouldRejectDifferentUnitOnCreationForManager() {
+            User manager = createUser(tenant1, unit1, UserRole.UNIT_MANAGER);
+            assertThrows(ResourceAccessDeniedException.class,
+                    () -> manager.validateCanCreate(UserRole.CANDIDATE, tenant1, unit2));
+        }
+
+        @Test
+        @DisplayName("L'owner peut créer dans n'importe quelle unité du centre")
+        void shouldAllowOwnerToCreateInAnyUnit() {
+            User owner = createUser(tenant1, unit1, UserRole.CENTER_OWNER);
+            assertDoesNotThrow(() -> owner.validateCanCreate(UserRole.CANDIDATE, tenant1, unit2));
+        }
+    }
+
+    @Nested
+    @DisplayName("Actions d'état et modifications")
+    class StatusAndAssignmentTests {
+
+        @Test
+        @DisplayName("Devrait désactiver et activer le compte")
+        void shouldToggleActivation() {
+            User user = createUser(tenant1, unit1, UserRole.CANDIDATE);
+
+            user.deactivate();
+            assertFalse(user.isActive());
+
+            user.activate();
+            assertTrue(user.isActive());
+        }
+
+        @Test
+        @DisplayName("Devrait assigner à une nouvelle unité")
+        void shouldAssignToUnit() {
+            User user = createUser(tenant1, unit1, UserRole.CANDIDATE);
+            UUID newUnitId = UUID.randomUUID();
+
+            user.assignToUnit(newUnitId);
+            assertEquals(newUnitId, user.getUnitId());
+        }
+
+        @Test
+        @DisplayName("Devrait changer le rôle si le demandeur est différent")
+        void shouldChangeRoleSuccessfully() {
+            User target = createUser(tenant1, unit1, UserRole.CANDIDATE);
+            UUID requesterId = UUID.randomUUID();
+
+            target.changeRole(UserRole.STAFF_MEMBER, requesterId);
+            assertEquals(UserRole.STAFF_MEMBER, target.getRole());
+        }
+    }
+
+    @Test
+    @DisplayName("Constructeur : devrait générer un ID si fourni null")
+    void shouldGenerateIdWhenNullProvided() {
+        User user = new User(null, "Ivan", "D", new Email("test@test.com"),
+                tenant1, unit1, UserRole.CANDIDATE, true, true, false);
+
+        assertNotNull(user.getId());
+    }
+
     @Test
     @DisplayName("Sécurité : un utilisateur ne peut pas changer son propre rôle")
     void shouldNotAllowSelfRoleChange() {

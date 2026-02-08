@@ -277,17 +277,15 @@ Pour plus de détails, consultez [API.md](./API.md).
 
 ## 🧪 Tests
 
-### Couverture actuelle : 67%
+### Couverture actuelle : 84% avec plus de 100 tests exécutés.
 
 ```bash
 # Exécuter tous les tests
 mvn test
 
-# Avec rapport de couverture
+# Avec rapport de couverture (à voir grâce au fichier target/site/index.html qui sera généré)
 mvn clean verify
 
-# Tests d'intégration uniquement
-mvn verify -Dtest=**/*IT
 ```
 
 ### Structure des tests
@@ -300,7 +298,7 @@ src/test/java/com/ivan/backend/
 └── presentation/  
 ```
 
-**Objectif** : Atteindre 80% de couverture dans les prochaines itérations.
+**Objectif** : Atteindre 100% de couverture dans les prochaines itérations.
 
 ## 🚢 Déploiement
 

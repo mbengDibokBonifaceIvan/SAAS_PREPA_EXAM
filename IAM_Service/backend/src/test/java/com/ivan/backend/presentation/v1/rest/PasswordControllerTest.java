@@ -44,8 +44,8 @@ class PasswordControllerTest {
 
         // WHEN & THEN
         mockMvc.perform(post("/v1/auth/forgot-password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value(containsString("réinitialisation a été envoyée")));
 
@@ -57,16 +57,32 @@ class PasswordControllerTest {
     void shouldReturn500WhenIdentityServiceFails() throws Exception {
         // GIVEN
         ForgotPasswordRequest request = new ForgotPasswordRequest("user@test.com");
-        
+
         // Simule une erreur technique (pas une erreur d'identifiants)
         doThrow(new KeycloakIdentityException("SMTP Error"))
                 .when(passwordResetInputPort).requestReset(anyString());
 
         // WHEN & THEN
         mockMvc.perform(post("/v1/auth/forgot-password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.title").value("Erreur Service Identité"));
+    }
+
+    @Test
+    @DisplayName("Forgot Password : devrait retourner 400 si l'email est mal formé ou vide")
+    void shouldReturn400WhenEmailIsInvalid() throws Exception {
+        // GIVEN : Email vide
+        ForgotPasswordRequest invalidRequest = new ForgotPasswordRequest("");
+
+        // WHEN & THEN
+        mockMvc.perform(post("/v1/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation échouée"));
+
+        verifyNoInteractions(passwordResetInputPort);
     }
 }

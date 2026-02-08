@@ -10,7 +10,7 @@ RUN mvn dependency:go-offline -B
 
 # Copie du code source et compilation
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn clean package 
 #- DskipTests pour éviter d'exécuter les tests pendant la construction
 #RUN mvn clean package 
 

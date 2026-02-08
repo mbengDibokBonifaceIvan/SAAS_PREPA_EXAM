@@ -46,8 +46,8 @@ class LogoutControllerTest {
 
         // WHEN & THEN
         mockMvc.perform(post("/v1/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNoContent());
 
         verify(logoutInputPort).execute("valid-refresh-token");
@@ -61,10 +61,10 @@ class LogoutControllerTest {
 
         // WHEN & THEN
         mockMvc.perform(post("/v1/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
-        
+
         verifyNoInteractions(logoutInputPort);
     }
 
@@ -73,15 +73,33 @@ class LogoutControllerTest {
     void shouldReturn500WhenKeycloakFailsUnexpectedly() throws Exception {
         // GIVEN
         LogoutRequest request = new LogoutRequest("some-token");
-        // On simule une erreur qui NE contient PAS "identifiants" pour tester la branche 500 de ton Handler
+        // On simule une erreur qui NE contient PAS "identifiants" pour tester la
+        // branche 500 de ton Handler
         doThrow(new KeycloakIdentityException("Erreur serveur Keycloak"))
                 .when(logoutInputPort).execute(anyString());
 
         // WHEN & THEN
         mockMvc.perform(post("/v1/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.title").value("Erreur Service Identité"));
+    }
+
+    @Test
+    @DisplayName("Logout : devrait retourner 401 si le token est déjà expiré ou invalide (via Handler)")
+    void shouldReturn401WhenTokenIsInvalid() throws Exception {
+        // GIVEN
+        LogoutRequest request = new LogoutRequest("expired-token");
+        // On simule le message qui déclenche le 401 dans ton GlobalExceptionHandler
+        doThrow(new KeycloakIdentityException("Identifiants ou session invalides"))
+                .when(logoutInputPort).execute(anyString());
+
+        // WHEN & THEN
+        mockMvc.perform(post("/v1/auth/logout")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Identifiants ou session invalides"));
     }
 }

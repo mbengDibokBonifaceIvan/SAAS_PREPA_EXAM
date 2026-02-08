@@ -8,6 +8,7 @@ import com.ivan.backend.application.port.in.ProvisionUserInputPort;
 import com.ivan.backend.application.port.in.SearchUserInputPort;
 import com.ivan.backend.application.port.in.UpdateUserInputPort;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,7 +40,7 @@ public class AccountManagementController {
     @PostMapping("/provision")
     @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER', 'STAFF_MEMBER')")
     public ResponseEntity<Map<String, String>> provisionAccount(
-            @RequestBody ProvisionUserRequest request,
+            @Valid @RequestBody ProvisionUserRequest request,
             @AuthenticationPrincipal Jwt jwt // On récupère le JWT de celui qui appelle l'API
     ) {
         // L'email du créateur est généralement dans le claim 'sub' ou 'email' du JWT

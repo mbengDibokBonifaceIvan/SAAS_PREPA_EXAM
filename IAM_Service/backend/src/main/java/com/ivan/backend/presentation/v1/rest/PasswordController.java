@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.ivan.backend.application.dto.ForgotPasswordRequest;
 import com.ivan.backend.application.port.in.PasswordResetInputPort;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -21,7 +22,7 @@ public class PasswordController {
     private final PasswordResetInputPort passwordResetInputPort;
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<Map<String, String>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         passwordResetInputPort.requestReset(request.email());
         
         return ResponseEntity.ok(Map.of(

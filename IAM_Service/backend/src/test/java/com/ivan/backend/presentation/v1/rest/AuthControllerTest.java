@@ -29,68 +29,100 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+        private ObjectMapper objectMapper = new ObjectMapper();
 
-    @MockitoBean
-    private LoginInputPort loginInputPort;
+        @MockitoBean
+        private LoginInputPort loginInputPort;
 
-    @Test
-    @DisplayName("Login : devrait retourner le token quand les identifiants sont corrects")
-    void shouldLoginSuccessfully() throws Exception {
-        // GIVEN
-        LoginRequest request = new LoginRequest("ivan@test.com", "password123");
-        LoginResponse response = new LoginResponse("access-token-xyz", "refresh-token-abc", 3600L, "ivan@test.com",
-                false, "UNIT_MANAGER");
+        @Test
+        @DisplayName("Login : devrait retourner le token quand les identifiants sont corrects")
+        void shouldLoginSuccessfully() throws Exception {
+                // GIVEN
+                LoginRequest request = new LoginRequest("ivan@test.com", "password123");
+                LoginResponse response = new LoginResponse("access-token-xyz", "refresh-token-abc", 3600L,
+                                "ivan@test.com",
+                                false, "UNIT_MANAGER");
 
-        when(loginInputPort.login(any(LoginRequest.class))).thenReturn(response);
+                when(loginInputPort.login(any(LoginRequest.class))).thenReturn(response);
 
-        // WHEN & THEN
-        mockMvc.perform(post("/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("access-token-xyz"))
-                .andExpect(jsonPath("$.expiresIn").value(3600))
-                .andExpect(jsonPath("$.email").value("ivan@test.com"))
-                .andExpect(jsonPath("$.mustChangePassword").value(false))
-                .andExpect(jsonPath("$.role").value("UNIT_MANAGER"));
+                // WHEN & THEN
+                mockMvc.perform(post("/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.accessToken").value("access-token-xyz"))
+                                .andExpect(jsonPath("$.expiresIn").value(3600))
+                                .andExpect(jsonPath("$.email").value("ivan@test.com"))
+                                .andExpect(jsonPath("$.mustChangePassword").value(false))
+                                .andExpect(jsonPath("$.role").value("UNIT_MANAGER"));
 
-        verify(loginInputPort).login(any(LoginRequest.class));
-    }
+                verify(loginInputPort).login(any(LoginRequest.class));
+        }
 
-    @Test
-    @DisplayName("Login : devrait retourner 400 si l'email est vide")
-    void shouldReturn400WhenRequestIsInvalid() throws Exception {
-        // GIVEN : email vide et mot de passe vide
-        LoginRequest invalidRequest = new LoginRequest("", "");
+        @Test
+        @DisplayName("Login : devrait retourner 400 si l'email est vide")
+        void shouldReturn400WhenRequestIsInvalid() throws Exception {
+                // GIVEN : email vide et mot de passe vide
+                LoginRequest invalidRequest = new LoginRequest("", "");
 
-        // WHEN & THEN
-        mockMvc.perform(post("/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest()); // Grâce à @Valid et aux annotations dans le Record
-    }
+                // WHEN & THEN
+                mockMvc.perform(post("/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(invalidRequest)))
+                                .andExpect(status().isBadRequest()); // Grâce à @Valid et aux annotations dans le Record
+        }
 
-    @Test
-    @DisplayName("Devrait retourner 401 via ProblemDetail si Keycloak échoue")
-    void should_return_401_when_keycloak_fails() throws Exception {
-        // GIVEN
-        LoginRequest request = new LoginRequest("bad@test.com", "wrong-pass");
+        @Test
+        @DisplayName("Devrait retourner 401 via ProblemDetail si Keycloak échoue")
+        void should_return_401_when_keycloak_fails() throws Exception {
+                // GIVEN
+                LoginRequest request = new LoginRequest("bad@test.com", "wrong-pass");
 
-        // Le message contient "identifiants" pour matcher ton Handler
-        when(loginInputPort.login(any(LoginRequest.class)))
-                .thenThrow(new KeycloakIdentityException("Identifiants invalides"));
+                // Le message contient "identifiants" pour matcher ton Handler
+                when(loginInputPort.login(any(LoginRequest.class)))
+                                .thenThrow(new KeycloakIdentityException("Identifiants invalides"));
 
-        // WHEN & THEN
-        mockMvc.perform(post("/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized())
-                // ProblemDetail utilise "detail" pour le message d'erreur
-                .andExpect(jsonPath("$.detail").value("Identifiants invalides"))
-                .andExpect(jsonPath("$.title").value("Erreur Service Identité"));
-    }
+                // WHEN & THEN
+                mockMvc.perform(post("/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isUnauthorized())
+                                // ProblemDetail utilise "detail" pour le message d'erreur
+                                .andExpect(jsonPath("$.detail").value("Identifiants invalides"))
+                                .andExpect(jsonPath("$.title").value("Erreur Service Identité"));
+        }
+
+        @Test
+        @DisplayName("Login : devrait retourner 403 si le compte est verrouillé")
+        void shouldReturn403WhenAccountLocked() throws Exception {
+                // GIVEN
+                LoginRequest request = new LoginRequest("locked@test.com", "password");
+                when(loginInputPort.login(any(LoginRequest.class)))
+                                .thenThrow(new com.ivan.backend.domain.exception.AccountLockedException(
+                                                "Compte verrouillé"));
+
+                // WHEN & THEN
+                mockMvc.perform(post("/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden()); // Ou isLocked() selon ton Handler
+        }
+
+        @Test
+        @DisplayName("Login : devrait retourner 500 pour une erreur technique inconnue")
+        void shouldReturn500WhenUnexpectedErrorOccurs() throws Exception {
+                // GIVEN
+                LoginRequest request = new LoginRequest("test@test.com", "password");
+                when(loginInputPort.login(any(LoginRequest.class)))
+                                .thenThrow(new RuntimeException("Crash serveur imprévu"));
+
+                // WHEN & THEN
+                mockMvc.perform(post("/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isInternalServerError());
+        }
 }
