@@ -6,7 +6,7 @@
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Microservice de gestion centralisée de l'identité et des accès pour la plateforme SaaS. Ce service fournit l'authentification, l'autorisation et la gestion des utilisateurs via Keycloak.
+Microservice de gestion centralisée de l'identité et des accès pour la plateforme SaaS de gestion de centres d'examens. Ce service fournit l'authentification multi-tenant, l'autorisation basée sur les rôles (RBAC) et la gestion complète du cycle de vie des utilisateurs (CENTER_OWNER, UNIT_MANAGER, STAFF_MEMBER, CANDIDATE).
 
 ## 📋 Table des matières
 
@@ -230,7 +230,7 @@ Pour sauvegarder votre configuration :
 #### Authentication
 | Méthode | Endpoint | Description | Auth requise |
 |---------|----------|-------------|--------------|
-| POST | `/v1/auth/onboarding` | Enregistrement d'une organisation | ❌ Public |
+| POST | `/v1/auth/onboarding` | Enregistrement d'un chef de centre et de son organisation | ❌ Public |
 | POST | `/v1/auth/login` | Authentification | ❌ Public |
 | POST | `/v1/auth/logout` | Déconnexion | ✅ User |
 | POST | `/v1/auth/forgot-password` | Réinitialisation de mot de passe | ❌ Public |
@@ -293,10 +293,11 @@ mvn verify -Dtest=**/*IT
 ### Structure des tests
 
 ```
-src/test/
-├── unit/                 # Tests unitaires du domain
-├── integration/          # Tests d'intégration
-└── architecture/         # ArchUnit tests (respect des couches)
+src/test/java/com/ivan/backend/
+├── domain/              
+├── application/       
+├── infrastructure/
+└── presentation/  
 ```
 
 **Objectif** : Atteindre 80% de couverture dans les prochaines itérations.
@@ -416,7 +417,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 ## 📞 Support
 
-- **Documentation API** : http://localhost:8081/swagger-ui.html (si Swagger activé)
+- **Documentation API** : http://localhost:8081/swagger-ui.html 
 - **Issues** : [GitHub Issues](https://github.com/votre-org/iam-service/issues)
 - **Wiki** : [Documentation complète](https://github.com/votre-org/iam-service/wiki)
 

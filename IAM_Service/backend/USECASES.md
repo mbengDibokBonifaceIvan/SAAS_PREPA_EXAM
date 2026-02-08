@@ -77,11 +77,12 @@ Visiteur non authentifié de la plateforme.
 **Exemple de requête** :
 ```json
 {
-  "organizationName": "Centre d'Examens de Paris",
-  "ownerEmail": "contact@examparis.fr",
   "ownerFirstName": "Marie",
   "ownerLastName": "Dupont",
-  "ownerPassword": "SecurePass123!"
+  "ownerEmail": "contact@examparis.fr",
+  "ownerPassword": "SecurePass123!",
+  "organizationName": "Centre d'Examens de Paris"
+
 }
 ```
 
@@ -184,12 +185,12 @@ Visiteur non authentifié de la plateforme.
 3. Le nouveau membre reçoit un email pour activer son compte
 
 **Post-conditions** :
-- Un nouveau compte est créé avec statut `enabled=false`
+- Un nouveau compte est créé avec statut `active=false`
 - Un événement `UserProvisionedEvent` est publié
 - Un email d'activation est envoyé
 
 **Règles métier** :
-- CENTER_OWNER peut créer : UNIT_MANAGER, STAFF_MEMBER, CANDIDATE
+- CENTER_OWNER peut créer : UNIT_MANAGER, STAFF_MEMBER, CANDIDATE (dans son centre uniquement)
 - UNIT_MANAGER peut créer : STAFF_MEMBER, CANDIDATE (dans son unité uniquement)
 - STAFF_MEMBER peut créer : CANDIDATE (dans son unité uniquement)
 
@@ -198,11 +199,11 @@ Visiteur non authentifié de la plateforme.
 **Exemple** :
 ```json
 {
-  "email": "jean.martin@example.com",
-  "firstName": "Jean",
-  "lastName": "Martin",
-  "role": "STAFF_MEMBER",
-  "unitId": "550e8400-e29b-41d4-a716-446655440001"
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "staff@example.com",
+    "role": "STAFF_MEMBER",
+    "unitId": "550e8400-e29b-41d4-a716-446655440001"
 }
 ```
 
@@ -248,7 +249,7 @@ Visiteur non authentifié de la plateforme.
 1. Le CENTER_OWNER sélectionne un utilisateur
 2. Il clique sur "Bannir"
 3. Le système :
-   - Désactive le compte (enabled=false)
+   - Désactive le compte (active=false)
    - Désactive le compte dans Keycloak
    - Publie un événement
 
@@ -333,15 +334,14 @@ Visiteur non authentifié de la plateforme.
 **Réponse** :
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "user@example.com",
-  "firstName": "Jean",
-  "lastName": "Martin",
-  "role": "STAFF_MEMBER",
-  "unitId": "550e8400-e29b-41d4-a716-446655440001",
-  "organizationId": "550e8400-e29b-41d4-a716-446655440002",
-  "enabled": true,
-  "emailVerified": true
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "user2@example.com",
+    "role": "UNIT_MANAGER",
+    "tenantId": "550e8400-e29b-41d4-a716-446655440008",
+    "unitId": "550e8400-e29b-41d4-a716-446655440001",
+    "active": true,
 }
 ```
 
@@ -387,6 +387,7 @@ Visiteur non authentifié de la plateforme.
 **Règle métier** :
 - Un UNIT_MANAGER ne peut voir que les utilisateurs de son unité
 - Il ne peut pas voir les utilisateurs des autres unités
+- Le OWNER_CENTER peut avoir accès à cette route si le sous centre appartient à son centre.
 
 **Endpoint** : `GET /v1/accounts/directory`
 
@@ -394,7 +395,7 @@ Visiteur non authentifié de la plateforme.
 
 ### UC-CONSULT-04 : Consulter un utilisateur par ID
 
-**Acteur** : CENTER_OWNER ou UNIT_MANAGER
+**Acteur** : CENTER_OWNER, UNIT_MANAGER ou STAFF_MEMBER
 
 **Description** : Récupération des détails d'un utilisateur spécifique.
 
@@ -410,6 +411,7 @@ Visiteur non authentifié de la plateforme.
 **Règles métier** :
 - CENTER_OWNER peut consulter tous les utilisateurs de l'organisation
 - UNIT_MANAGER peut consulter uniquement les utilisateurs de son unité
+- STAFF_MEMBER peut consulter uniquement les candidats de son unité
 
 **Endpoint** : `GET /v1/accounts/{id}`
 
@@ -450,7 +452,7 @@ CENTER_OWNER (Propriétaire)
 |------|----------------|
 | **CENTER_OWNER** | Tous les utilisateurs de l'organisation |
 | **UNIT_MANAGER** | Utilisateurs de son unité uniquement |
-| **STAFF_MEMBER** | Son propre profil uniquement |
+| **STAFF_MEMBER** | Candidats de son unité uniquement |
 | **CANDIDATE** | Son propre profil uniquement |
 
 ### RG-04 : Matrice de permissions (Modification)

@@ -13,6 +13,7 @@ Authentification avec email et mot de passe.
 **Permissions:** Public
 
 **Request Body:**
+
 ```json
 {
   "email": "user@example.com",
@@ -21,6 +22,7 @@ Authentification avec email et mot de passe.
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -31,10 +33,12 @@ Authentification avec email et mot de passe.
 ```
 
 **Error Responses:**
+
 - `401 Unauthorized` - Identifiants invalides
 - `400 Bad Request` - Données de requête invalides
 
 **cURL Example:**
+
 ```bash
 curl -X POST http://localhost:8081/v1/auth/login \
   -H "Content-Type: application/json" \
@@ -55,6 +59,7 @@ Déconnexion et révocation du refresh token.
 **Permissions:** Authenticated
 
 **Request Body:**
+
 ```json
 {
   "refreshToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -64,6 +69,7 @@ Déconnexion et révocation du refresh token.
 **Response:** `204 No Content`
 
 **cURL Example:**
+
 ```bash
 curl -X POST http://localhost:8081/v1/auth/logout \
   -H "Content-Type: application/json" \
@@ -97,41 +103,49 @@ Enregistre une nouvelle organisation avec son propriétaire (CENTER_OWNER).
 **Permissions:** Public
 
 **Request Body:**
+
 ```json
 {
-  "organizationName": "Mon Centre d'Examens",
-  "ownerEmail": "owner@example.com",
   "ownerFirstName": "John",
   "ownerLastName": "Doe",
-  "ownerPassword": "SecurePassword123!"
+  "ownerEmail": "owner@example.com",
+  "ownerPassword": "SecurePassword123!",
+  "organizationName": "Mon Centre d'Examens",
+
 }
 ```
 
 **Response:** `201 Created`
+
 ```json
 {
-  "organizationId": "550e8400-e29b-41d4-a716-446655440000",
-  "organizationName": "Mon Centre d'Examens",
-  "ownerEmail": "owner@example.com",
-  "message": "Organisation créée avec succès"
+
+  "ownerFirstName": "John",
+  "ownerLastName": "Doe",
+  "isActive": "false",
+  "externalOrganizationId": "550e8400-e29b-41d4-a716-446655440000",
+  "mustChangePassword": "false",
+  "isEmailVerified": "false"
 }
 ```
 
 **Error Responses:**
+
 - `400 Bad Request` - Données invalides
 - `409 Conflict` - Organisation ou email déjà existant
 
 **cURL Example:**
+
 ```bash
 curl -X POST http://localhost:8081/v1/auth/onboarding \
   -H "Content-Type: application/json" \
   -d '{
-    "organizationName": "Mon Centre d'\''Examens",
-    "ownerEmail": "owner@example.com",
     "ownerFirstName": "John",
     "ownerLastName": "Doe",
-    "ownerPassword": "SecurePassword123!"
-  }'
+    "ownerEmail": "owner@example.com",
+    "ownerPassword": "SecurePassword123!",
+    "organizationName": "Mon Centre d'Examens",
+}'
 ```
 
 ---
@@ -145,6 +159,7 @@ Demande de réinitialisation du mot de passe.
 **Permissions:** Public
 
 **Request Body:**
+
 ```json
 {
   "email": "user@example.com"
@@ -152,6 +167,7 @@ Demande de réinitialisation du mot de passe.
 ```
 
 **Response:** `200 OK`
+
 ```json
 {
   "message": "Si un compte est associé à cet email, une procédure de réinitialisation a été envoyée."
@@ -159,6 +175,7 @@ Demande de réinitialisation du mot de passe.
 ```
 
 **cURL Example:**
+
 ```bash
 curl -X POST http://localhost:8081/v1/auth/forgot-password \
   -H "Content-Type: application/json" \
@@ -182,17 +199,19 @@ Provisionne un nouveau compte (Staff ou Candidat). Accessible uniquement aux CEN
 **Permissions:** `CENTER_OWNER`, `UNIT_MANAGER`, `STAFF_MEMBER`
 
 **Request Body:**
+
 ```json
 {
-  "email": "staff@example.com",
   "firstName": "Jane",
   "lastName": "Smith",
+  "email": "staff@example.com",
   "role": "STAFF_MEMBER",
   "unitId": "550e8400-e29b-41d4-a716-446655440001"
 }
 ```
 
 **Response:** `201 Created`
+
 ```json
 {
   "message": "Utilisateur provisionné avec succès. Un email d'activation lui a été envoyé."
@@ -200,19 +219,21 @@ Provisionne un nouveau compte (Staff ou Candidat). Accessible uniquement aux CEN
 ```
 
 **Error Responses:**
+
 - `400 Bad Request` - Données invalides
 - `403 Forbidden` - Permissions insuffisantes
 - `409 Conflict` - Email déjà utilisé
 
 **cURL Example:**
+
 ```bash
 curl -X POST http://localhost:8081/v1/accounts/provision \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "staff@example.com",
     "firstName": "Jane",
     "lastName": "Smith",
+    "email": "staff@example.com",
     "role": "STAFF_MEMBER",
     "unitId": "550e8400-e29b-41d4-a716-446655440001"
   }'
@@ -229,23 +250,22 @@ Récupère le profil de l'utilisateur authentifié.
 **Permissions:** Authenticated user
 
 **Response:** `200 OK`
+
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "user@example.com",
   "firstName": "John",
   "lastName": "Doe",
+  "email": "user@example.com",
   "role": "CENTER_OWNER",
-  "unitId": null,
-  "organizationId": "550e8400-e29b-41d4-a716-446655440002",
-  "enabled": true,
-  "emailVerified": true,
-  "createdAt": "2026-02-08T10:30:00Z",
-  "updatedAt": "2026-02-08T10:35:00Z"
+  "tenantId": "550e8400-e29b-41d4-a716-446655440005",
+  "unitId": "550e8400-e29b-41d4-a716-446655440002",
+  "active": true
 }
 ```
 
 **cURL Example:**
+
 ```bash
 curl -X GET http://localhost:8081/v1/accounts/me \
   -H "Authorization: Bearer YOUR_TOKEN"
@@ -262,35 +282,39 @@ Récupère l'annuaire des utilisateurs selon les droits de l'utilisateur authent
 **Permissions:** `CENTER_OWNER`, `UNIT_MANAGER`
 
 **Query Parameters:**
+
 - `unitId` (UUID, optional) - Filtrer par unité
 
 **Response:** `200 OK`
+
 ```json
 [
   {
     "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user1@example.com",
     "firstName": "John",
     "lastName": "Doe",
+    "email": "user1@example.com",
     "role": "STAFF_MEMBER",
-    "unitId": "550e8400-e29b-41d4-a716-446655440001",
-    "enabled": true,
-    "createdAt": "2026-02-08T10:30:00Z"
+    "tenantId": "550e8400-e29b-41d4-a716-446655440001",
+    "unitId": "550e8400-e29b-41d4-a716-446655440002",
+    "active": true
   },
+
   {
     "id": "550e8400-e29b-41d4-a716-446655440003",
-    "email": "user2@example.com",
     "firstName": "Jane",
     "lastName": "Smith",
+    "email": "user2@example.com",
     "role": "UNIT_MANAGER",
+    "tenantId": "550e8400-e29b-41d4-a716-446655440008",
     "unitId": "550e8400-e29b-41d4-a716-446655440001",
-    "enabled": true,
-    "createdAt": "2026-02-08T11:15:00Z"
+    "active": true,
   }
 ]
 ```
 
 **cURL Examples:**
+
 ```bash
 # Tous les utilisateurs (CENTER_OWNER)
 curl -X GET http://localhost:8081/v1/accounts/directory \
@@ -312,30 +336,31 @@ Récupère les informations d'un utilisateur par son ID.
 **Permissions:** `CENTER_OWNER`, `UNIT_MANAGER`
 
 **Path Parameters:**
+
 - `id` (UUID) - ID de l'utilisateur
 
 **Response:** `200 OK`
+
 ```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "role": "STAFF_MEMBER",
-  "unitId": "550e8400-e29b-41d4-a716-446655440001",
-  "organizationId": "550e8400-e29b-41d4-a716-446655440002",
-  "enabled": true,
-  "emailVerified": true,
-  "createdAt": "2026-02-08T10:30:00Z",
-  "updatedAt": "2026-02-08T10:35:00Z"
-}
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "user2@example.com",
+    "role": "UNIT_MANAGER",
+    "tenantId": "550e8400-e29b-41d4-a716-446655440008",
+    "unitId": "550e8400-e29b-41d4-a716-446655440001",
+    "active": true,
+  }
 ```
 
 **Error Responses:**
+
 - `404 Not Found` - Utilisateur non trouvé
 - `403 Forbidden` - Permissions insuffisantes
 
 **cURL Example:**
+
 ```bash
 curl -X GET http://localhost:8081/v1/accounts/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer YOUR_TOKEN"
@@ -352,13 +377,16 @@ Met à jour les informations d'un utilisateur.
 **Permissions:** `CENTER_OWNER`, `UNIT_MANAGER`, `STAFF_MEMBER` (avec restrictions)
 
 **Path Parameters:**
+
 - `id` (UUID) - ID de l'utilisateur
 
 **Request Body:**
+
 ```json
 {
   "firstName": "John",
   "lastName": "Smith",
+  "role": "UNIT_MANAGER",
   "unitId": "550e8400-e29b-41d4-a716-446655440001"
 }
 ```
@@ -366,11 +394,13 @@ Met à jour les informations d'un utilisateur.
 **Response:** `204 No Content`
 
 **Error Responses:**
+
 - `404 Not Found` - Utilisateur non trouvé
 - `403 Forbidden` - Permissions insuffisantes
 - `400 Bad Request` - Données invalides
 
 **cURL Example:**
+
 ```bash
 curl -X PUT http://localhost:8081/v1/accounts/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -378,6 +408,7 @@ curl -X PUT http://localhost:8081/v1/accounts/550e8400-e29b-41d4-a716-4466554400
   -d '{
     "firstName": "John",
     "lastName": "Smith",
+    "role": "UNIT_MANAGER",
     "unitId": "550e8400-e29b-41d4-a716-446655440001"
   }'
 ```
@@ -393,16 +424,19 @@ Désactive le compte d'un utilisateur.
 **Permissions:** `CENTER_OWNER` uniquement
 
 **Path Parameters:**
+
 - `email` (string) - Email de l'utilisateur à bannir
 
 **Response:** `204 No Content`
 
 **Error Responses:**
+
 - `404 Not Found` - Utilisateur non trouvé
 - `403 Forbidden` - Seul le CENTER_OWNER peut bannir
 - `409 Conflict` - L'utilisateur est déjà banni
 
 **cURL Example:**
+
 ```bash
 curl -X PATCH http://localhost:8081/v1/accounts/user@example.com/ban \
   -H "Authorization: Bearer YOUR_TOKEN"
@@ -419,16 +453,19 @@ Active le compte d'un utilisateur précédemment banni.
 **Permissions:** `CENTER_OWNER` uniquement
 
 **Path Parameters:**
+
 - `email` (string) - Email de l'utilisateur à activer
 
 **Response:** `204 No Content`
 
 **Error Responses:**
+
 - `404 Not Found` - Utilisateur non trouvé
 - `403 Forbidden` - Seul le CENTER_OWNER peut activer
 - `409 Conflict` - L'utilisateur est déjà actif
 
 **cURL Example:**
+
 ```bash
 curl -X PATCH http://localhost:8081/v1/accounts/user@example.com/activate \
   -H "Authorization: Bearer YOUR_TOKEN"
@@ -440,191 +477,143 @@ curl -X PATCH http://localhost:8081/v1/accounts/user@example.com/activate \
 
 Le système utilise les rôles suivants avec une hiérarchie de permissions :
 
-| Rôle | Description | Permissions |
-|------|-------------|-------------|
-| **CENTER_OWNER** | Propriétaire du centre | Tous les accès, gestion de l'organisation |
-| **UNIT_MANAGER** | Gestionnaire d'unité | Gestion de son unité et des utilisateurs de l'unité |
-| **STAFF_MEMBER** | Membre du personnel | Accès limité selon les fonctionnalités |
-| **CANDIDATE** | Candidat | Accès aux examens et résultats personnels |
+| Rôle             | Description            | Permissions                                         |
+| ---------------- | ---------------------- | --------------------------------------------------- |
+| **CENTER_OWNER** | Propriétaire du centre | Tous les accès, gestion de l'organisation           |
+| **UNIT_MANAGER** | Gestionnaire d'unité   | Gestion de son unité et des utilisateurs de l'unité |
+| **STAFF_MEMBER** | Membre du personnel    | Accès limité selon les fonctionnalités              |
+| **CANDIDATE**    | Candidat               | Accès aux examens et résultats personnels           |
 
 ### Modèles de données
 
 #### UserResponse
 
 ```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "role": "STAFF_MEMBER",
-  "unitId": "550e8400-e29b-41d4-a716-446655440001",
-  "organizationId": "550e8400-e29b-41d4-a716-446655440002",
-  "enabled": true,
-  "emailVerified": true,
-  "createdAt": "2026-02-08T10:30:00Z",
-  "updatedAt": "2026-02-08T10:35:00Z"
-}
-```
-
----
-
-#### Health Check
-
-Vérifie l'état du service.
-
-**Endpoint:** `GET /actuator/health`
-
-**Permissions:** Public
-
-**Response:** `200 OK`
-```json
-{
-  "status": "UP",
-  "components": {
-    "db": {
-      "status": "UP",
-      "details": {
-        "database": "PostgreSQL",
-        "validationQuery": "isValid()"
-      }
-    },
-    "keycloak": {
-      "status": "UP"
-    },
-    "rabbitmq": {
-      "status": "UP"
-    }
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "user2@example.com",
+    "role": "UNIT_MANAGER",
+    "tenantId": "550e8400-e29b-41d4-a716-446655440008",
+    "unitId": "550e8400-e29b-41d4-a716-446655440001",
+    "active": true,
   }
-}
 ```
-
 ---
 
-#### Service Info
+## 🛠 Gestion des Erreurs (API Standard RFC 7807)
 
-Informations sur le service.
-
-**Endpoint:** `GET /actuator/info`
-
-**Permissions:** Public
-
-**Response:** `200 OK`
-```json
-{
-  "app": {
-    "name": "IAM Service",
-    "version": "1.0.0",
-    "description": "Identity and Access Management Service"
-  },
-  "build": {
-    "artifact": "iam-service",
-    "name": "iam-service",
-    "time": "2026-02-08T10:00:00Z",
-    "version": "1.0.0"
-  }
-}
-```
-
----
-
-## Error Responses
-
-Tous les endpoints peuvent retourner les erreurs suivantes :
+L'API utilise le format Problem Details for HTTP APIs pour fournir des erreurs descriptives et actionnables. Toutes les réponses d'erreur incluent un type pointant vers la documentation et un timestamp.
 
 ### 400 Bad Request
+
+Retourné en cas d'erreur de syntaxe JSON ou de violation de règle métier simple.
+
 ```json
 {
-  "timestamp": "2026-02-08T10:30:00Z",
+  "type": "https://api.exams.com/errors/business-rule-violation",
+  "title": "Règle métier violée",
   "status": 400,
-  "error": "Bad Request",
-  "message": "Validation failed",
-  "errors": [
-    {
-      "field": "email",
-      "message": "must be a well-formed email address",
-      "rejectedValue": "invalid-email"
-    }
-  ],
-  "path": "/api/v1/users"
+  "detail": "Le nom de l'organisation ne peut pas être vide",
+  "instance": "/api/v1/users",
+  "timestamp": "2026-02-08T11:45:00.000Z"
+}
+```
+
+### Erreur de Validation (DTO)
+
+Lorsqu'un ou plusieurs champs ne respectent pas les contraintes @Valid, l'objet contient un champ invalid_params.
+
+```json
+{
+  "type": "https://api.exams.com/errors/validation-error",
+  "title": "Validation échouée",
+  "status": 400,
+  "detail": "Champs invalides",
+  "instance": "/api/v1/users",
+  "timestamp": "2026-02-08T11:45:10.000Z",
+  "invalid_params": {
+    "email": "doit être une adresse email bien formée",
+    "password": "doit contenir au moins 8 caractères"
+  }
 }
 ```
 
 ### 401 Unauthorized
+
+Retourné lorsque le jeton (Token) est manquant, expiré ou invalide.
+
 ```json
 {
-  "timestamp": "2026-02-08T10:30:00Z",
+  "type": "https://api.exams.com/errors/identity-service-error",
+  "title": "Erreur Service Identité",
   "status": 401,
-  "error": "Unauthorized",
-  "message": "Full authentication is required to access this resource",
-  "path": "/api/v1/users"
+  "detail": "Identifiants invalides ou session expirée",
+  "instance": "/api/v1/resource",
+  "timestamp": "2026-02-08T11:46:00.000Z"
 }
 ```
 
 ### 403 Forbidden
+
+Retourné en cas de compte verrouillé ou de permissions insuffisantes pour accéder à une ressource spécifique.
+
 ```json
 {
-  "timestamp": "2026-02-08T10:30:00Z",
+  "type": "https://api.exams.com/errors/insufficient-privileges",
+  "title": "Droits insuffisants",
   "status": 403,
-  "error": "Forbidden",
-  "message": "Access denied. Required role: ADMIN",
-  "path": "/api/v1/users"
+  "detail": "Vous n'avez pas le rôle OWNER_CENTER requis pour cette action",
+  "instance": "/api/v1/admin/settings",
+  "timestamp": "2026-02-08T11:47:00.000Z"
 }
 ```
 
 ### 404 Not Found
+
+Retourné lorsqu'une ressource (utilisateur, organisation, etc.) n'existe pas en base.
+
 ```json
 {
-  "timestamp": "2026-02-08T10:30:00Z",
+  "type": "https://api.exams.com/errors/not-found",
+  "title": "Ressource non trouvée",
   "status": 404,
-  "error": "Not Found",
-  "message": "User not found with id: 550e8400-e29b-41d4-a716-446655440000",
-  "path": "/api/v1/users/550e8400-e29b-41d4-a716-446655440000"
+  "detail": "Unable to find com.ivan.backend.User with id 550e8400...",
+  "instance": "/api/v1/users/550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2026-02-08T11:48:00.000Z"
 }
 ```
 
 ### 409 Conflict
+
+Retourné lorsqu'un utilisateur avec le même email existe déjà ou qu'une contrainte de base de données est violée.
+
 ```json
 {
-  "timestamp": "2026-02-08T10:30:00Z",
+  "type": "https://api.exams.com/errors/user-already-exists",
+  "title": "Conflit d'identité",
   "status": 409,
-  "error": "Conflict",
-  "message": "Resource already exists",
-  "path": "/api/v1/users"
+  "detail": "Un utilisateur existe déjà avec l'email: test@example.com",
+  "instance": "/api/v1/users",
+  "timestamp": "2026-02-08T11:49:00.000Z"
 }
 ```
 
 ### 500 Internal Server Error
+
+Retourné en cas d'erreur imprévue ou de panne du service d'identité (Keycloak).
+
 ```json
 {
-  "timestamp": "2026-02-08T10:30:00Z",
+  "type": "https://api.exams.com/errors/internal-server-error",
+  "title": "Erreur Interne",
   "status": 500,
-  "error": "Internal Server Error",
-  "message": "An unexpected error occurred",
-  "path": "/api/v1/users"
+  "detail": "Une erreur inattendue est survenue.",
+  "instance": "/api/v1/users",
+  "timestamp": "2026-02-08T11:50:00.000Z"
 }
 ```
-
----
-
-## Rate Limiting
-
-| Plan | Requests per minute | Burst |
-|------|---------------------|-------|
-| Free | 60 | 10 |
-| Pro | 600 | 100 |
-
-Dépassement de limite :
-```json
-{
-  "timestamp": "2026-02-08T10:30:00Z",
-  "status": 429,
-  "error": "Too Many Requests",
-  "message": "Rate limit exceeded. Try again in 30 seconds.",
-  "retryAfter": 30
-}
-```
-
 ---
 
 ## Webhooks / Events
@@ -633,49 +622,14 @@ Le service IAM publie des événements sur RabbitMQ pour notifier les autres ser
 
 ### Événements disponibles
 
-| Événement | Exchange | Routing Key | Description |
-|-----------|----------|-------------|-------------|
-| OrganizationCreated | `organization.events` | `organization.created` | Organisation créée lors de l'onboarding |
-| UserProvisioned | `user.events` | `user.provisioned` | Utilisateur provisionné (Staff/Candidat) |
-| UserActivated | `user.events` | `user.activated` | Compte utilisateur activé |
-| UserBanned | `user.events` | `user.banned` | Compte utilisateur banni |
-| UserUpdated | `user.events` | `user.updated` | Profil utilisateur mis à jour |
-| PasswordResetRequested | `user.events` | `user.password.reset_requested` | Demande de réinitialisation de mot de passe |
-
-### Format des événements
-
-```json
-{
-  "eventId": "uuid",
-  "eventType": "UserProvisionedEvent",
-  "aggregateId": "user-uuid",
-  "occurredAt": "2026-02-08T10:30:00Z",
-  "version": 1,
-  "payload": {
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user@example.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "role": "STAFF_MEMBER",
-    "organizationId": "550e8400-e29b-41d4-a716-446655440002",
-    "unitId": "550e8400-e29b-41d4-a716-446655440001",
-    "createdBy": "owner@example.com"
-  }
-}
-```
-
----
-
-### Health & Monitoring
-
-## Postman Collection
-
-Une collection Postman est disponible : [Download Collection](./postman/IAM-Service.postman_collection.json)
-
-Import dans Postman :
-1. File → Import
-2. Sélectionner le fichier JSON
-3. Configurer l'environnement avec votre token
+| Événement              | Exchange              | Routing Key                     | Description                                 |
+| ---------------------- | --------------------- | ------------------------------- | ------------------------------------------- |
+| OrganizationCreated    | `iam.exchange` | `organization.registered`          | Organisation créée lors de l'onboarding     |
+| UserProvisioned        | `iam.exchange`         | `user.provisioned`              | Utilisateur provisionné (Staff/Candidat)    |
+| UserActivated          | `iam.exchange`         | `account.activated`                | Compte utilisateur activé                   |
+| UserBanned             | `iam.exchange`         | `account.banned`                   | Compte utilisateur banni                    |
+| PasswordResetRequested | `iam.exchange`         | `password.reset.requested` | Demande de réinitialisation de mot de passe |
+| UserUpdated            | `iam.exchange`         | `user.updated`                  | Profil utilisateur mis à jour               |
 
 ---
 

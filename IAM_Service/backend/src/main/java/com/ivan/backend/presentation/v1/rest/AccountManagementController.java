@@ -101,7 +101,7 @@ public class AccountManagementController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER')")
+    @PreAuthorize("hasAnyRole('CENTER_OWNER', 'UNIT_MANAGER', 'STAFF_MEMBER')")
     public ResponseEntity<UserResponse> getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         // Il faudra ajouter cette méthode dans ton UseCase
         UserResponse user = UserResponse.fromDomain(searchUserPort.getUserById(id, jwt.getClaimAsString(EMAIL)));
