@@ -71,4 +71,50 @@ class ManageAccountUseCaseTest {
         // On vérifie qu'on s'est arrêté dès le début
         verifyNoInteractions(identityManagerPort, messagePublisher);
     }
+
+    @Test
+    @DisplayName("Activation : devrait réactiver le compte localement et sur Keycloak")
+    void shouldActivateAccountSuccessfully() {
+        // GIVEN
+        String targetEmail = "user@test.com";
+        String adminEmail = "admin@test.com";
+        
+        User target = mock(User.class);
+        User requester = mock(User.class);
+
+        when(userRepository.findByEmail(new Email(targetEmail))).thenReturn(Optional.of(target));
+        when(userRepository.findByEmail(new Email(adminEmail))).thenReturn(Optional.of(requester));
+
+        // WHEN
+        manageAccountUseCase.activateAccount(targetEmail, adminEmail);
+
+        // THEN
+        verify(requester).checkCanManage(target); // Sécurité
+        verify(target).activate();                // Action domaine
+        verify(userRepository).save(target);       // Persistence
+        verify(identityManagerPort).enableIdentity(targetEmail); // Keycloak
+        verify(messagePublisher).publishAccountActivated(any());  // Notification
+    }
+
+    @Test
+    @DisplayName("Sécurité : devrait échouer si le demandeur (requester) n'existe pas")
+    void shouldThrowExceptionWhenRequesterNotFound() {
+        // GIVEN
+        String targetEmail = "user@test.com";
+        String unknownAdmin = "ghost@test.com";
+        
+        User target = mock(User.class);
+
+        // La cible existe, mais le demandeur non
+        when(userRepository.findByEmail(new Email(targetEmail))).thenReturn(Optional.of(target));
+        when(userRepository.findByEmail(new Email(unknownAdmin))).thenReturn(Optional.empty());
+
+        // WHEN & THEN
+        assertThrows(EntityNotFoundException.class, () -> {
+            manageAccountUseCase.banAccount(targetEmail, unknownAdmin);
+        });
+
+        // On vérifie que les actions externes n'ont JAMAIS été appelées
+        verifyNoInteractions(identityManagerPort, messagePublisher);
+    }
 }

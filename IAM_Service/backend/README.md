@@ -277,7 +277,7 @@ Pour plus de détails, consultez [API.md](./API.md).
 
 ## 🧪 Tests
 
-### Couverture actuelle : 84% avec plus de 100 tests exécutés.
+### Couverture actuelle : 87% pour envriron 120 tests exécutés.
 
 ```bash
 # Exécuter tous les tests
