@@ -71,6 +71,8 @@ public class ProvisionUserUseCase implements ProvisionUserInputPort {
         // 7. Notification / Événement (Asynchrone)
         messagePublisher.publishUserProvisioned(new UserProvisionedEvent(
                 newUser.getId(),
+                newUser.getFirstName(),
+                newUser.getLastName(),
                 newUser.getEmail().value(), 
                 newUser.getRole(),
                 newUser.getTenantId(),

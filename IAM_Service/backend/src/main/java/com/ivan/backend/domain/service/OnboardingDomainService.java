@@ -21,6 +21,7 @@ public class OnboardingDomainService {
         return new OrganizationRegisteredEvent(
             owner.getTenantId(),
             orgName,
+            owner.getId(),
             owner.getEmail().value(),
             owner.getFirstName(),
             owner.getLastName(),

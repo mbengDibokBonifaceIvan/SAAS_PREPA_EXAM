@@ -29,7 +29,7 @@ public class PasswordResetUseCase implements PasswordResetInputPort {
             .ifPresent(user -> {
                 identityManagerPort.sendPasswordReset(email);
                 messagePublisher.publishPasswordResetRequested(
-                    new PasswordResetRequestedEvent(email, LocalDateTime.now())
+                    new PasswordResetRequestedEvent(user.getId(), user.getFirstName(), user.getLastName(), email, LocalDateTime.now())
                 );
             });
         

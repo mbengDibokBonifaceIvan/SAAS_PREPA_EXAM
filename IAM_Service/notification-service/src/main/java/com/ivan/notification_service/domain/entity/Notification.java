@@ -34,9 +34,10 @@ public class Notification {
     }
 
     private void selfValidate() {
-        if (userId == null) throw new InvalidNotificationException("User ID cannot be null");
-        if (recipient == null || recipient.isBlank()) throw new InvalidNotificationException("Recipient cannot be empty");
-        if (type == null) throw new InvalidNotificationException("Notification type must be specified");
+        if (userId == null)
+            throw new InvalidNotificationException("Le User ID est obligatoire", "userId");
+        if (recipient == null || recipient.isBlank())
+            throw new InvalidNotificationException("Le destinataire est vide", "recipient");
     }
 
     public void markAsSent() {

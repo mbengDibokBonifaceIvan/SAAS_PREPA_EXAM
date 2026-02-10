@@ -6,7 +6,9 @@ import java.util.UUID;
 
 public record UserProvisionedEvent(
     UUID userId,
-    String email,
+    String firstName, 
+    String lastName,
+    String userEmail,
     UserRole role,
     UUID tenantId,
     LocalDateTime occurredAt

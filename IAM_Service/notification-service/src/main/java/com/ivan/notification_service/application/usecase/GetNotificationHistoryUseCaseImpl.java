@@ -1,9 +1,10 @@
 package com.ivan.notification_service.application.usecase;
 
 
-import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,10 +27,9 @@ public class GetNotificationHistoryUseCaseImpl implements GetNotificationHistory
 
     @Override
     @Transactional(readOnly = true)
-    public List<NotificationResponse> getForUser(UUID userId) {
-        // Le repository devra avoir une méthode findByUserId
-        return repository.findById(userId).stream()
-                .map(mapper::toResponse)
-                .toList();
+    public Page<NotificationResponse> getForUser(UUID userId, Pageable pageable) {
+        // Le repository doit maintenant accepter un Pageable
+        return repository.findByUserId(userId, pageable)
+                .map(mapper::toResponse);
     }
 }

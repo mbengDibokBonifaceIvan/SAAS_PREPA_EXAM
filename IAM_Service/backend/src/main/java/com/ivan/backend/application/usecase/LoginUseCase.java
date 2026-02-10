@@ -81,6 +81,9 @@ public class LoginUseCase implements LoginInputPort {
 
             // Notification via Event
             messagePublisher.publishAccountLocked(new AccountLockedEvent(
+                    user.getId(),
+                    user.getFirstName(),
+                    user.getLastName(),
                     user.getEmail().value(),
                     e.getMessage(),
                     LocalDateTime.now(),

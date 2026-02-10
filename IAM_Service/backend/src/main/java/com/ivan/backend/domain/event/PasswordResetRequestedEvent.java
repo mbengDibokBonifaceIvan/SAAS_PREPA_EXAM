@@ -1,8 +1,12 @@
 package com.ivan.backend.domain.event;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record PasswordResetRequestedEvent(
-    String email, 
+    UUID userId,
+    String firstName,
+    String lastName,
+    String userEmail, 
     LocalDateTime requestedAt
 ) {}

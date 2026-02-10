@@ -22,7 +22,7 @@ public class EmailNotificationAdapter implements NotificationSender {
         log.info("Envoi d'un email à : {}", notification.getRecipient());
         
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("no-reply@votre-saas.com");
+        message.setFrom("imbeng18@skilyo-saas.com");
         message.setTo(notification.getRecipient());
         message.setSubject(notification.getTitle());
         message.setText(notification.getMessage());

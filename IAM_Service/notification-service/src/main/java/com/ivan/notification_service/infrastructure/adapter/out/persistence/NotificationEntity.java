@@ -15,7 +15,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications", indexes = {
+    @jakarta.persistence.Index(name = "idx_user_id", columnList = "userId")
+})
 @Getter @Setter
 public class NotificationEntity {
     @Id
@@ -23,6 +25,7 @@ public class NotificationEntity {
     private UUID userId;
     private String recipient;
     private String title;
+    @jakarta.persistence.Column(columnDefinition = "TEXT")
     private String message;
     @Enumerated(EnumType.STRING)
     private NotificationType type;

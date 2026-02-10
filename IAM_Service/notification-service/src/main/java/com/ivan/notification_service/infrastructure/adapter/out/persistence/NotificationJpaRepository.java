@@ -1,11 +1,15 @@
 package com.ivan.notification_service.infrastructure.adapter.out.persistence;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.UUID;
 
+@Repository
 public interface NotificationJpaRepository extends JpaRepository<NotificationEntity, UUID> {
-    List<NotificationEntity> findByUserId(UUID userId);
+    // Spring Data JPA gère automatiquement le Pageable
+    Page<NotificationEntity> findByUserId(UUID userId, Pageable pageable);
 }
 

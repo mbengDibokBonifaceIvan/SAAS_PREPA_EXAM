@@ -4,5 +4,4 @@ import java.util.UUID;
 
 // 1. Sécurité (Account Locked/Banned)
 public interface SendSecurityNotificationUseCase {
-    void handle(UUID userId, String email, String alertType);
-}
+void handle(UUID userId, String email, String name, String alertType, String detailedReason);}

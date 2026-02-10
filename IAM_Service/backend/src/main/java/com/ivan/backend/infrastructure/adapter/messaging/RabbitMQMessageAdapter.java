@@ -38,7 +38,7 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
 
     @Override
     public void publishAccountLocked(AccountLockedEvent event) {
-        log.warn("Publication de l'événement de verrouillage pour: {}", event.email());
+        log.warn("Publication de l'événement de verrouillage pour: {}", event.userEmail());
 
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.EXCHANGE_NAME,
@@ -48,7 +48,7 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
 
     @Override
     public void publishPasswordResetRequested(PasswordResetRequestedEvent event) {
-        log.info("Envoi de l'événement de réinitialisation pour : {}", event.email());
+        log.info("Envoi de l'événement de réinitialisation pour : {}", event.userEmail());
 
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.EXCHANGE_NAME,
@@ -62,7 +62,7 @@ public class RabbitMQMessageAdapter implements MessagePublisherPort {
                 RabbitMQConfig.EXCHANGE_NAME,
                 RabbitMQConfig.ROUTING_KEY_USER_PROVISIONED,
                 event);
-        log.info("Événement UserProvisioned publié pour : {}", event.email());
+        log.info("Événement UserProvisioned publié pour : {}", event.userEmail());
     }
 
     @Override

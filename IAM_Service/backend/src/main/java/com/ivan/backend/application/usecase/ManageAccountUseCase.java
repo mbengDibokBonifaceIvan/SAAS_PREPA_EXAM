@@ -44,9 +44,8 @@ public class ManageAccountUseCase implements ManageAccountInputPort {
         // 3. Action Keycloak
         identityManagerPort.disableIdentity(userEmail);
 
-        // 4. Notification
-        messagePublisher.publishAccountBanned(new AccountBannedEvent(
-                userEmail, "Désactivé par un administrateur", requesterEmail, LocalDateTime.now()));
+        // 4. Notification: on va informer le target que son compte a été banni, et aussi qui est le responsable de cette action
+        messagePublisher.publishAccountBanned(new AccountBannedEvent(target.getId(), target.getFirstName(), target.getLastName(), userEmail, "Banni par un administrateur", requesterEmail, LocalDateTime.now()));
         
         log.info("Compte banni : {} par {}", userEmail, requesterEmail);
     }
@@ -68,7 +67,7 @@ public class ManageAccountUseCase implements ManageAccountInputPort {
         identityManagerPort.enableIdentity(userEmail);
 
         // 4. Notification
-        messagePublisher.publishAccountActivated(new AccountActivatedEvent(
+        messagePublisher.publishAccountActivated(new AccountActivatedEvent(target.getId(), target.getFirstName(), target.getLastName(),
                 userEmail, "Activé par un administrateur", requesterEmail, LocalDateTime.now()));
         
         log.info("Compte activé : {} par {}", userEmail, requesterEmail);
