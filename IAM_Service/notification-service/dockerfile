@@ -1,0 +1,28 @@
+# Étape 1 : Build
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /app
+
+# Cache des dépendances
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Compilation sans les tests (ils sont faits dans le CI GitHub)
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# Étape 2 : Run
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+
+# Sécurité : Création d'un utilisateur non-root
+# Sur Ubuntu Jammy, useradd est déjà présent, pas besoin de shadow
+RUN useradd -ms /bin/bash springuser
+USER springuser
+
+# Copie du jar (plus précis pour éviter les conflits)
+# On suppose que ton artifactId dans pom.xml est 'notification-service'
+COPY --from=build /app/target/notification-service-*.jar app.jar
+
+# Configuration JVM Java 21
+# ZGC Generational est incroyable pour les microservices (réduit les pauses GC)
+ENTRYPOINT ["java", "-XX:+UseZGC", "-XX:+ZGenerational", "-jar", "app.jar"]

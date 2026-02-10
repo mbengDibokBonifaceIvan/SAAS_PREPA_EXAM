@@ -1,0 +1,49 @@
+Identifiants de portainer io: admin/championne2003 
+
+Configurer Mailhog dans Keycloak
+2. Configurer Keycloak
+Une fois Mailhog lancé, connecte-toi à ton Administration Console Keycloak :
+
+Sélectionne ton Realm (ex: my-app-realm).
+
+Dans le menu de gauche, clique sur Realm Settings.
+
+Va dans l'onglet Email.
+
+Remplis les champs avec les informations suivantes :
+
+Section : Connection & Authentication
+Host : localhost (ou mailhog si Keycloak est aussi dans Docker sur le même réseau).
+
+Port : 1025
+
+Encryption : Laisse sur None (Mailhog n'utilise pas de SSL/TLS par défaut).
+
+Authentication : Désactive (Set to Off). Mailhog n'a pas besoin d'identifiants.
+
+Section : Email Settings
+From : admin@monprojet.com (ou n'importe quelle adresse fictive).
+
+From Display Name : Mon App Auth
+
+3. Tester la configuration
+En bas de la page de configuration Email dans Keycloak, tu trouveras un bouton "Test connection".
+
+Clique sur le bouton (Keycloak va t'envoyer un mail de test).
+
+Ouvre ton navigateur à l'adresse http://localhost:8025.
+
+Tu devrais voir apparaître instantanément le mail de test envoyé par Keycloak.
+
+
+
+4. Structure des Use Cases dans ton code
+Dans ton architecture Hexagonale, je vois ces Use Cases (Input Ports) :
+
+SendSecurityNotification : Déclenché par AccountLocked ou AccountBanned. Priorité haute.
+
+SendOnboardingWelcome : Déclenché par OrganizationRegistered.
+
+ProcessGenericFeedback : Le fameux template flexible pour toutes les actions UI.
+
+NotificationHistoryConsultation : Pour que l'utilisateur voie ses anciennes notifs dans l'app (via ta Gateway).

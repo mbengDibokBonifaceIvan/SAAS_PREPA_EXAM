@@ -6,8 +6,8 @@ services:
     environment:
       POSTGRES_USER: user_admin
       POSTGRES_PASSWORD: password_secure
-      # On initialise deux DB : une pour Keycloak, une pour notre IAM
-      POSTGRES_MULTIPLE_DATABASES: keycloak_db,iam_logic_db
+      # On initialise trois DB : une pour Keycloak, une pour notre IAM et une pour les notifications
+      POSTGRES_MULTIPLE_DATABASES: keycloak_db,iam_logic_db,notification_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
@@ -36,7 +36,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
     container_name: iam-keycloak
-  # On ajoute explicitement --import-realm à la commande
+    # On ajoute explicitement --import-realm à la commande
     command: start-dev --http-enabled=true --hostname=localhost --import-realm
     environment:
       KC_DB: postgres
@@ -53,9 +53,9 @@ services:
       # On force Keycloak à toujours se considérer comme localhost:8080
       KC_HOSTNAME: localhost
       # Cette commande force l'import au démarrage
-      KC_IMPORT: /opt/keycloak/data/import/realm-export.json
-    volumes:
-     - ./backend/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      #KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+    #volumes:
+     # - ./backend/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
       - "8080:8080"
     healthcheck:
@@ -75,6 +75,53 @@ services:
     networks:
       - iam-network
 
+  # Faux serveur SMTP pour intercepter les emails
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: iam-mailhog
+    ports:
+      - "1025:1025" # Port SMTP (pour l'envoi depuis Keycloak/Spring)
+      - "8025:8025" # Interface Web (pour voir les mails dans ton navigateur)
+    networks:
+      - iam-network
+    restart: always
+
+  consul:
+    image: hashicorp/consul:latest
+    container_name: iam-consul
+    ports:
+      - "8500:8500"
+    command: agent -dev -client=0.0.0.0
+    networks:
+      - iam-network
+
+  
+  # Ton Service de Notification (Spring Boot)
+  notification-service:
+    build: ./notification-service
+    container_name: notification-app
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://iam-db:5432/notification_db
+      - SPRING_DATASOURCE_USERNAME=user_admin
+      - SPRING_DATASOURCE_PASSWORD=password_secure
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - SPRING_MAIL_HOST=mailhog
+      - SPRING_MAIL_PORT=1025
+      - SPRING_CLOUD_CONSUL_HOST=consul
+    depends_on:
+      iam-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      consul:
+        condition: service_started
+    networks:
+      - iam-network
+  
   # Ton Service IAM (Spring Boot)
   iam-service:
     build: ./backend
@@ -106,7 +153,6 @@ services:
         condition: service_started
     networks:
       - iam-network
-
 
 networks:
   iam-network:
