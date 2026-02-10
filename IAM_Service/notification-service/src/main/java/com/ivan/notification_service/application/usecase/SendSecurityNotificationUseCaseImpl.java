@@ -40,17 +40,18 @@ public class SendSecurityNotificationUseCaseImpl implements SendSecurityNotifica
         // On utilise des séparateurs et des libellés clairs
         String message = String.format(
                 "Bonjour %s,\n\n" +
-                "Nous avons détecté une activité importante concernant la sécurité de votre compte.\n\n" +
-                "------------------------------------------\n" +
-                "📌 ACTION : %s\n" +
-                "📝 DÉTAIL : %s\n" +
-                "------------------------------------------\n\n" +
-                "🛡️ S'IL NE S'AGIT PAS DE VOUS :\n" +
-                "Si vous n'êtes pas à l'origine de cette opération, votre compte est peut-être menacé. " +
-                "Veuillez réinitialiser votre mot de passe immédiatement ou contacter notre support technique.\n\n" +
-                "Besoin d'aide ? Répondez à ce mail ou visitez notre centre d'assistance.\n\n" +
-                "Cordialement,\n" +
-                "L'équipe Sécurité SAAS.",
+                        "Nous avons détecté une activité importante concernant la sécurité de votre compte.\n\n" +
+                        "------------------------------------------\n" +
+                        "📌 ACTION : %s\n" +
+                        "📝 DÉTAIL : %s\n" +
+                        "------------------------------------------\n\n" +
+                        "🛡️ S'IL NE S'AGIT PAS DE VOUS :\n" +
+                        "Si vous n'êtes pas à l'origine de cette opération, votre compte est peut-être menacé. " +
+                        "Veuillez réinitialiser votre mot de passe immédiatement ou contacter notre support technique.\n\n"
+                        +
+                        "Besoin d'aide ? Répondez à ce mail ou visitez notre centre d'assistance.\n\n" +
+                        "Cordialement,\n" +
+                        "L'équipe Sécurité SAAS.",
                 name, actionHeader, detailedReason);
 
         Notification notification = Notification.builder()
