@@ -1,14 +1,14 @@
 package com.ivan.notification_service.presentation.v1.rest.controller;
 
 import com.ivan.notification_service.application.dto.FeedbackRequest;
+import com.ivan.notification_service.application.dto.SecurityAlertRequest;
+import com.ivan.notification_service.application.dto.UserNotificationRequest;
 import com.ivan.notification_service.application.port.in.OnboardingUseCase;
 import com.ivan.notification_service.application.port.in.ProcessGenericFeedbackUseCase;
 import com.ivan.notification_service.application.port.in.SendSecurityNotificationUseCase;
 import com.ivan.notification_service.infrastructure.adapter.in.push.ToastPushNotificationAdapter;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/notifications/commands")
 @RequiredArgsConstructor
-@Tag(name = "Notification Commands", description = "Endpoints pour déclencher l'envoi de notifications manuellement")
+@Tag(name = "Notification Commands", description = "Endpoints de commande pour l'envoi de notifications")
 public class NotificationCommandController {
 
     private final SendSecurityNotificationUseCase securityUseCase;
@@ -29,64 +29,51 @@ public class NotificationCommandController {
     private final ProcessGenericFeedbackUseCase feedbackUseCase;
     private final ToastPushNotificationAdapter sseAdapter;
 
-    @Operation(summary = "Alerte de sécurité", description = "Envoie une notification suite à un verrouillage ou bannissement")
+    @Operation(summary = "Alerte de sécurité", description = "Alerte suite à un verrouillage ou bannissement")
     @PostMapping("/security-alert")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void sendSecurityAlert(
-            @RequestParam UUID userId,
-            @RequestParam String email,
-            @RequestParam String name,
-            @Parameter(description = "Ex: USER_LOCKED, ACCOUNT_BANNED") @RequestParam String alertType,
-            @RequestParam String reason) {
-        securityUseCase.handle(userId, email, name, alertType, reason);
+    public void sendSecurityAlert(@RequestBody @Valid SecurityAlertRequest req) {
+        securityUseCase.handle(req.userId(), req.email(), req.name(), req.alertType(), req.reason());
     }
 
-    @Operation(summary = "Réinitialisation de mot de passe", description = "Alerte l'utilisateur qu'une demande de reset a été effectuée")
+    @Operation(summary = "Réinitialisation de mot de passe", description = "Alerte de demande de reset")
     @PostMapping("/password-reset")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void sendPasswordReset(
-            @RequestParam UUID userId,
-            @RequestParam String email,
-            @RequestParam String name) {
-        securityUseCase.handle(userId, email, name, "RÉINITIALISATION DE MOT DE PASSE",
-                "Une demande de modification de vos identifiants a été reçue.");
+    public void sendPasswordReset(@RequestBody @Valid UserNotificationRequest req) {
+        securityUseCase.handle(req.userId(), req.email(), req.name(), 
+                "RÉINITIALISATION DE MOT DE PASSE", "Demande de modification reçue.");
     }
 
-    @Operation(summary = "Bienvenue Organisation", description = "Envoie l'email de bienvenue après la création d'une organisation")
+    @Operation(summary = "Bienvenue Organisation", description = "Email de bienvenue organisation")
     @PostMapping("/welcome-org")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void sendWelcomeOrg(@RequestParam UUID userId, @RequestParam String email, @RequestParam String name,
-            @RequestParam String orgName) {
-        onboardingUseCase.handleOrganizationWelcome(userId, email, name, orgName);
+    public void sendWelcomeOrg(@RequestBody @Valid UserNotificationRequest req) {
+        onboardingUseCase.handleOrganizationWelcome(req.userId(), req.email(), req.name(), req.detail());
     }
 
-    @Operation(summary = "Activation de compte", description = "Informe l'utilisateur que son compte est désormais actif")
+    @Operation(summary = "Activation de compte", description = "Notification de compte actif")
     @PostMapping("/account-activation")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void sendActivation(@RequestParam UUID userId, @RequestParam String email, @RequestParam String name,
-            @RequestParam String reason) {
-        onboardingUseCase.handleAccountActivation(userId, email, name, reason);
+    public void sendActivation(@RequestBody @Valid UserNotificationRequest req) {
+        onboardingUseCase.handleAccountActivation(req.userId(), req.email(), req.name(), req.detail());
     }
 
-    @Operation(summary = "Provisionnement utilisateur", description = "Informe un collaborateur qu'un compte lui a été créé par un administrateur")
+    @Operation(summary = "Provisionnement utilisateur", description = "Alerte création de compte par admin")
     @PostMapping("/user-provisioned")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void sendProvisioning(@RequestParam UUID userId, @RequestParam String email, @RequestParam String name,
-            @RequestParam String role) {
-        onboardingUseCase.handleUserProvisioned(userId, email, name, role);
+    public void sendProvisioning(@RequestBody @Valid UserNotificationRequest req) {
+        onboardingUseCase.handleUserProvisioned(req.userId(), req.email(), req.name(), req.detail());
     }
 
-    @ApiResponse(responseCode = "202", description = "Demande d'envoi acceptée")
-    @Operation(summary = "Feedback générique", description = "Envoi d'une notification via un objet JSON")
+    @Operation(summary = "Feedback générique", description = "Envoi manuel (Email, Push, etc.)")
     @PostMapping("/feedback")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void sendFeedback(@RequestBody @Valid FeedbackRequest request) {
-        feedbackUseCase.handle(request);
+    public void sendFeedback(@RequestBody @Valid FeedbackRequest req) {
+        feedbackUseCase.handle(req);
     }
 
     @GetMapping(value = "/{userId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribe(@PathVariable UUID userId) {
         return sseAdapter.registerClient(userId);
     }
-
 }
