@@ -1,12 +1,9 @@
 package com.ivan.notification_service.application.port.in;
 
-import java.util.UUID;
-
+import com.ivan.notification_service.application.dto.FeedbackRequest;
 
 // 3. Feedback Générique (Actions UI)
+
 public interface ProcessGenericFeedbackUseCase {
-    /**
-     * @param severity : SUCCESS, INFO, WARNING, ERROR (utilisé pour la couleur du Toast)
-     */
-    void handle(UUID userId, String title, String message, String severity);
+    void handle(FeedbackRequest request);
 }

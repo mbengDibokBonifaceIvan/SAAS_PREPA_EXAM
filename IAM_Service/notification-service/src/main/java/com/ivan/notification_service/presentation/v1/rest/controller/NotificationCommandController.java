@@ -1,5 +1,6 @@
 package com.ivan.notification_service.presentation.v1.rest.controller;
 
+import com.ivan.notification_service.application.dto.FeedbackRequest;
 import com.ivan.notification_service.application.port.in.OnboardingUseCase;
 import com.ivan.notification_service.application.port.in.ProcessGenericFeedbackUseCase;
 import com.ivan.notification_service.application.port.in.SendSecurityNotificationUseCase;
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -74,17 +76,12 @@ public class NotificationCommandController {
         onboardingUseCase.handleUserProvisioned(userId, email, name, role);
     }
 
-    @Operation(summary = "Feedback générique", description = "Envoi d'une notification libre (Email, Push, etc.)")
     @ApiResponse(responseCode = "202", description = "Demande d'envoi acceptée")
+    @Operation(summary = "Feedback générique", description = "Envoi d'une notification via un objet JSON")
     @PostMapping("/feedback")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void sendFeedback(
-            @RequestParam UUID userId,
-            @RequestParam String title,
-            @RequestParam String message,
-            @RequestParam String severity) {
-
-        feedbackUseCase.handle(userId, title, message, severity);
+    public void sendFeedback(@RequestBody @Valid FeedbackRequest request) {
+        feedbackUseCase.handle(request);
     }
 
     @GetMapping(value = "/{userId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

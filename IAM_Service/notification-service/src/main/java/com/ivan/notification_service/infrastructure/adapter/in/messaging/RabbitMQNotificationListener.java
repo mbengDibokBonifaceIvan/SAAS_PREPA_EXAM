@@ -18,6 +18,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RabbitMQNotificationListener {
 
+    // Constantes pour éviter la duplication des littéraux
+    private static final String KEY_USER_EMAIL = "userEmail";
+    private static final String KEY_FIRST_NAME = "firstName";
+    private static final String KEY_LAST_NAME = "lastName";
+    private static final String KEY_USER_ID = "userId";
+    private static final String KEY_REASON = "reason";
+
     private final SendSecurityNotificationUseCase securityUseCase;
     private final OnboardingUseCase onboardingUseCase;
 
@@ -26,90 +33,81 @@ public class RabbitMQNotificationListener {
         log.info("Événement reçu via RabbitMQ avec routingKey: {}", routingKey);
 
         try {
-            switch (routingKey) {
-                case "organization.registered": {
-                    String email = String.valueOf(message.get("ownerEmail"));
-                    String fullName = String.format("%s %s", message.get("ownerFirstName"),
-                            message.get("ownerLastName"));
-                    String orgName = String.valueOf(message.get("organizationName"));
-
-                    Object rawId = message.get("ownerId");
-                    UUID ownerId = (rawId instanceof UUID) ? (UUID) rawId : UUID.fromString(rawId.toString());
-
-                    onboardingUseCase.handleOrganizationWelcome(ownerId, email, fullName, orgName);
-                    break;
-                }
-
-                case "user.locked", "account.banned": {
-                    String userEmail = String.valueOf(message.get("userEmail"));
-                    String reasonFromIAM = String.valueOf(message.get("reason"));
-                    // Ajout du nom pour la sécurité aussi
-                    String fullName = String.format("%s %s", message.get("firstName"), message.get("lastName"));
-
-                    Object rawUserId = message.get("userId");
-                    UUID targetUserId = (rawUserId instanceof UUID) ? (UUID) rawUserId
-                            : UUID.fromString(rawUserId.toString());
-
-                    securityUseCase.handle(targetUserId, userEmail, fullName, routingKey.toUpperCase(), reasonFromIAM);
-                    break;
-                }
-
-                case "account.activated": {
-                    String firstName = String.valueOf(message.get("firstName"));
-                    String lastName = String.valueOf(message.get("lastName"));
-                    String userEmail = String.valueOf(message.get("userEmail"));
-                    String reason = String.valueOf(message.get("reason"));
-                    String fullName = (message.get("firstName") != null) ? firstName + " " + lastName
-                            : "cher utilisateur";
-
-                    Object rawId = message.get("userId");
-                    UUID userId = (rawId instanceof UUID) ? (UUID) rawId : UUID.fromString(rawId.toString());
-
-                    onboardingUseCase.handleAccountActivation(userId, userEmail, fullName,
-                            "votre compte est désormais actif (" + reason + ")");
-                    break;
-                }
-
-                case "password.reset.requested": {
-                    String email = String.valueOf(message.get("userEmail"));
-                    String firstName = String.valueOf(message.get("firstName"));
-                    String lastName = String.valueOf(message.get("lastName"));
-                    String fullName = (firstName != null) ? firstName + " " + lastName : "Cher utilisateur";
-
-                    Object rawId = message.get("userId");
-                    UUID userId = (rawId instanceof UUID) ? (UUID) rawId : UUID.fromString(rawId.toString());
-
-                    // On utilise le securityUseCase car c'est une action sensible
-                    securityUseCase.handle(
-                            userId,
-                            email,
-                            fullName,
-                            "RÉINITIALISATION DE MOT DE PASSE",
-                            "Une demande de modification de vos identifiants a été reçue.");
-                    break;
-                }
-
-                case "user.provisioned": {
-                    String email = String.valueOf(message.get("userEmail"));
-                    String fullName = (message.get("firstName") != null)
-                            ? message.get("firstName") + " " + message.get("lastName")
-                            : "Cher collaborateur";
-                    String role = String.valueOf(message.get("role"));
-
-                    Object rawId = message.get("userId");
-                    UUID userId = (rawId instanceof UUID) ? (UUID) rawId : UUID.fromString(rawId.toString());
-
-                    onboardingUseCase.handleUserProvisioned(userId, email, fullName, role);
-                    break;
-                }
-                default:
-                    log.debug("Routing key non traitée : {}", routingKey);
-            }
+            processRouting(message, routingKey);
         } catch (Exception e) {
             log.error("Erreur lors du traitement du message RabbitMQ", e);
-            // En relançant l'exception, Spring AMQP n'envoie pas l'ACK (Acknowledgment)
-            // Le message sera re-livré selon la politique de ton broker.
             throw e;
         }
+    }
+
+    private void processRouting(Map<String, Object> message, String routingKey) {
+        switch (routingKey) {
+            case "organization.registered" -> handleOrgRegistered(message);
+            case "user.locked", "account.banned" -> handleSecurityAlert(message, routingKey);
+            case "account.activated" -> handleAccountActivated(message);
+            case "password.reset.requested" -> handlePasswordReset(message);
+            case "user.provisioned" -> handleUserProvisioning(message);
+            default -> log.debug("Routing key non traitée : {}", routingKey);
+        }
+    }
+
+    private void handleOrgRegistered(Map<String, Object> message) {
+        String email = String.valueOf(message.get("ownerEmail"));
+        String fullName = formatFullName(message.get("ownerFirstName"), message.get("ownerLastName"));
+        String orgName = String.valueOf(message.get("organizationName"));
+        UUID ownerId = parseUUID(message.get("ownerId"));
+
+        onboardingUseCase.handleOrganizationWelcome(ownerId, email, fullName, orgName);
+    }
+
+    private void handleSecurityAlert(Map<String, Object> message, String routingKey) {
+        String userEmail = String.valueOf(message.get(KEY_USER_EMAIL));
+        String reason = String.valueOf(message.get(KEY_REASON));
+        String fullName = formatFullName(message.get(KEY_FIRST_NAME), message.get(KEY_LAST_NAME));
+        UUID targetUserId = parseUUID(message.get(KEY_USER_ID));
+
+        securityUseCase.handle(targetUserId, userEmail, fullName, routingKey.toUpperCase(), reason);
+    }
+
+    private void handleAccountActivated(Map<String, Object> message) {
+        String userEmail = String.valueOf(message.get(KEY_USER_EMAIL));
+        String reason = String.valueOf(message.get(KEY_REASON));
+        String fullName = formatFullName(message.get(KEY_FIRST_NAME), message.get(KEY_LAST_NAME));
+        UUID userId = parseUUID(message.get(KEY_USER_ID));
+
+        onboardingUseCase.handleAccountActivation(userId, userEmail, fullName,
+                "votre compte est désormais actif (" + reason + ")");
+    }
+
+    private void handlePasswordReset(Map<String, Object> message) {
+        String email = String.valueOf(message.get(KEY_USER_EMAIL));
+        String fullName = formatFullName(message.get(KEY_FIRST_NAME), message.get(KEY_LAST_NAME));
+        UUID userId = parseUUID(message.get(KEY_USER_ID));
+
+        securityUseCase.handle(userId, email, fullName, "RÉINITIALISATION DE MOT DE PASSE",
+                "Une demande de modification de vos identifiants a été reçue.");
+    }
+
+    private void handleUserProvisioning(Map<String, Object> message) {
+        String email = String.valueOf(message.get(KEY_USER_EMAIL));
+        String fullName = formatFullName(message.get(KEY_FIRST_NAME), message.get(KEY_LAST_NAME));
+        String role = String.valueOf(message.get("role"));
+        UUID userId = parseUUID(message.get(KEY_USER_ID));
+
+        onboardingUseCase.handleUserProvisioned(userId, email, fullName, role);
+    }
+
+    // --- Utility Methods ---
+
+    private String formatFullName(Object firstName, Object lastName) {
+        if (firstName == null) return "Cher utilisateur";
+        return String.format("%s %s", firstName, lastName);
+    }
+
+    private UUID parseUUID(Object rawId) {
+        if (rawId instanceof UUID uuid) {
+            return uuid;
+        }
+        return UUID.fromString(String.valueOf(rawId));
     }
 }
