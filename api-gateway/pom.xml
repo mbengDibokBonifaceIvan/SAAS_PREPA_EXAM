@@ -47,9 +47,9 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-consul-discovery</artifactId>
 		</dependency>
-		<dependency>
+		  <dependency>
 			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-gateway-server-webmvc</artifactId>
+			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
 		</dependency>
 
 		<dependency>

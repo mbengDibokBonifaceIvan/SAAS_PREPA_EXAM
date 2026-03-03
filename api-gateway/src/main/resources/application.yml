@@ -1,0 +1,58 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    consul:
+      host: ${SPRING_CLOUD_CONSUL_HOST:localhost}
+      port: 8500
+      discovery:
+        prefer-ip-address: true
+        service-name: api-gateway
+        instance-id: ${spring.application.name}:${random.value}
+        health-check-path: /actuator/health
+        health-check-interval: 10s
+
+    gateway:
+      # Activation de la découverte automatique des services
+     # discovery:
+      #  locator:
+       #   enabled: true
+        #  lower-case-service-id: true
+
+      # Définition explicite de tes routes
+      routes:
+        - id: iam-service-route
+          uri: lb://iam-service
+          predicates:
+            - Path=/v1/auth/**,/v1/accounts/**
+         # filters:
+          #  - PreserveHostHeader
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://iam-keycloak:8080/realms/ExamsRealm
+          jwk-set-uri: http://iam-keycloak:8080/realms/ExamsRealm/protocol/openid-connect/certs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,gateway" # Utilise des guillemets
+  endpoint:
+    gateway:
+      enabled: true # Force l'activation de l'endpoint gateway
+    health:
+      show-details: always
+
+# Configuration logs pour voir passer les requêtes vers le backend
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.http.server.reactive: DEBUG
+    org.springframework.web.reactive: DEBUG

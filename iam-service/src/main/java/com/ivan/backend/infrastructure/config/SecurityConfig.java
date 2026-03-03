@@ -38,7 +38,10 @@ public class SecurityConfig {
 
                         // 2. Autoriser tes endpoints publics (Onboarding / Login)
                         .requestMatchers("/v1/auth/**").permitAll()
-
+                        
+                        // Autorise l'accès public aux endpoints de santé pour Consul
+                        .requestMatchers("/actuator/**").permitAll()
+                        
                         // 3. Verrouiller le reste
                         .anyRequest().authenticated())
                 // AJOUT CRUCIAL : Configurer le backend comme un serveur de ressources JWT

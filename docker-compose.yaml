@@ -10,14 +10,14 @@ services:
       POSTGRES_MULTIPLE_DATABASES: keycloak_db,iam_logic_db,notification_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+      - ./iam-service/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
     ports:
       - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user_admin -d iam_logic_db"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 20
       start_period: 20s
     networks:
       - iam-network
@@ -55,7 +55,7 @@ services:
       # Cette commande force l'import au démarrage
       #KC_IMPORT: /opt/keycloak/data/import/realm-export.json
     #volumes:
-     # - ./backend/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    # - ./backend/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
       - "8080:8080"
     healthcheck:
@@ -95,7 +95,6 @@ services:
     networks:
       - iam-network
 
-  
   # Ton Service de Notification (Spring Boot)
   notification-service:
     build: ./notification-service
@@ -121,10 +120,39 @@ services:
         condition: service_started
     networks:
       - iam-network
-  
+
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway-app
+    ports:
+      - "8090:8090"
+    environment:
+      - SPRING_CLOUD_CONSUL_HOST=iam-consul
+      - SPRING_CLOUD_CONSUL_PORT=8500
+      # On active tout par défaut pour tester
+      - SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_ENABLED=true
+      - SPRING_CLOUD_GATEWAY_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID=true
+      # Actuator
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,gateway
+      - MANAGEMENT_ENDPOINT_GATEWAY_ENABLED=true
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      consul:
+        condition: service_started
+      keycloak:
+        condition: service_healthy # Attendre que Keycloak soit VRAIMENT prêt
+    networks:
+      - iam-network
+
   # Ton Service IAM (Spring Boot)
   iam-service:
-    build: ./backend
+    build: ./iam-service
     container_name: iam-service-app
     ports:
       - "8081:8081"
@@ -143,6 +171,8 @@ services:
 
       # SOLUTION RÉSEAU : Le backend va quand même chercher les clés de validation via le réseau interne Docker
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://iam-keycloak:8080/realms/ExamsRealm/protocol/openid-connect/certs
+      - SPRING_CLOUD_CONSUL_HOST=iam-consul
+      - SPRING_CLOUD_CONSUL_DISCOVERY_PREFER_IP_ADDRESS=true
 
     depends_on:
       iam-db:
